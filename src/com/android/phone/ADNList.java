@@ -21,18 +21,24 @@ import static android.view.Window.PROGRESS_VISIBILITY_ON;
 
 import android.app.ListActivity;
 import android.content.AsyncQueryHandler;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.Window;
 import android.widget.CursorAdapter;
 import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
+
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.TelephonyIntents;
 
 /**
  * ADN List activity for the Phone app.
@@ -70,6 +76,23 @@ public class ADNList extends ListActivity {
 
     protected int mInitialSelection = -1;
 
+    protected BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                String stateExtra = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                if (stateExtra != null
+                        && IccCardConstants.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
+                    if (mCursor != null) {
+                        mCursor.deactivate();
+                    }
+                    mCursorAdapter = null;
+                    setListAdapter(null);
+                    displayProgress(false);
+                }
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
@@ -82,7 +105,29 @@ public class ADNList extends ListActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        query();
+        final IntentFilter intentFilter =
+               new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+        registerReceiver(mBroadcastReceiver, intentFilter);
+
+        final TelephonyManager telephonyManager =
+               (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        if (telephonyManager != null
+                && telephonyManager.getSimState() == telephonyManager.SIM_STATE_UNKNOWN) {
+            if (mCursor != null) {
+                mCursor.deactivate();
+            }
+            mCursorAdapter = null;
+            setListAdapter(null);
+            displayProgress(false);
+        } else {
+            query();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(mBroadcastReceiver);
     }
 
     @Override
