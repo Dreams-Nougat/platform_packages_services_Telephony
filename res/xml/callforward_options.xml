@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:telephony="http://schemas.android.com/apk/res/com.android.telephony.services"
+     android:title="@string/call_forwarding_settings">
+
+
+    <!-- Note for all com.android.telephony.services.EditPreference objects
+
+         The last several attributes are for use with the EditText field
+         in the dialog.  These attributes are forwarded to that field
+         when the edittext is created.  The attributes include:
+           1. android:singleLine
+           2. android:autoText
+           3. android:background -->
+
+    <com.android.telephony.services.CallForwardEditPreference
+        android:key="button_cfu_key"
+        android:title="@string/labelCFU"
+        android:persistent="false"
+        android:summaryOn="@string/sum_cfu_enabled"
+        android:summaryOff="@string/sum_cfu_disabled"
+        android:dialogTitle="@string/labelCFU"
+        android:dialogMessage="@string/messageCFU"
+        telephony:confirmMode="activation"
+        telephony:serviceClass="voice"
+        telephony:reason="unconditional"
+        android:singleLine="true"
+        android:autoText="false"
+        android:enabled="false" />
+
+    <!-- See note on com.android.telephony.services.EditPreference above -->
+    <com.android.telephony.services.CallForwardEditPreference
+        android:key="button_cfb_key"
+        android:title="@string/labelCFB"
+        android:persistent="false"
+        android:summaryOn="@string/sum_cfb_enabled"
+        android:summaryOff="@string/sum_cfb_disabled"
+        android:dialogTitle="@string/labelCFB"
+        android:dialogMessage="@string/messageCFB"
+        telephony:confirmMode="activation"
+        telephony:serviceClass="voice"
+        telephony:reason="busy"
+        android:dependency="button_cfu_key"
+        android:singleLine="true"
+        android:autoText="false"
+        android:enabled="false" />
+
+    <!-- See note on com.android.telephony.services.EditPreference above -->
+    <com.android.telephony.services.CallForwardEditPreference
+        android:key="button_cfnry_key"
+        android:title="@string/labelCFNRy"
+        android:persistent="false"
+        android:summaryOn="@string/sum_cfnry_enabled"
+        android:summaryOff="@string/sum_cfnry_disabled"
+        android:dialogTitle="@string/labelCFNRy"
+        android:dialogMessage="@string/messageCFNRy"
+        telephony:confirmMode="activation"
+        telephony:serviceClass="voice"
+        telephony:reason="no_reply"
+        android:dependency="button_cfu_key"
+        android:singleLine="true"
+        android:autoText="false"
+        android:enabled="false" />
+
+    <!-- See note on com.android.telephony.services.EditPreference above -->
+    <com.android.telephony.services.CallForwardEditPreference
+        android:key="button_cfnrc_key"
+        android:title="@string/labelCFNRc"
+        android:persistent="false"
+        android:summaryOn="@string/sum_cfnrc_enabled"
+        android:summaryOff="@string/sum_cfnrc_disabled"
+        android:dialogTitle="@string/labelCFNRc"
+        android:dialogMessage="@string/messageCFNRc"
+        telephony:confirmMode="activation"
+        telephony:serviceClass="voice"
+        telephony:reason="not_reachable"
+        android:dependency="button_cfu_key"
+        android:singleLine="true"
+        android:autoText="false"
+        android:enabled="false" />
+</PreferenceScreen>
