@@ -24,6 +24,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Window;
@@ -31,6 +32,7 @@ import android.widget.Toast;
 
 import static android.view.Window.PROGRESS_VISIBILITY_OFF;
 import static android.view.Window.PROGRESS_VISIBILITY_ON;
+import static com.android.internal.telephony.MSimConstants.SUBSCRIPTION_KEY;
 
 /**
  * Activity to let the user delete an FDN contact.
@@ -39,14 +41,15 @@ public class DeleteFdnContactScreen extends Activity {
     private static final String LOG_TAG = PhoneGlobals.LOG_TAG;
     private static final boolean DBG = false;
 
-    private static final String INTENT_EXTRA_NAME = "name";
-    private static final String INTENT_EXTRA_NUMBER = "number";
+    private static int mSubscription = 0;
+    protected static final String INTENT_EXTRA_NAME = "name";
+    protected static final String INTENT_EXTRA_NUMBER = "number";
 
     private static final int PIN2_REQUEST_CODE = 100;
 
-    private String mName;
-    private String mNumber;
-    private String mPin2;
+    protected String mName;
+    protected String mNumber;
+    protected String mPin2;
 
     protected QueryHandler mQueryHandler;
 
@@ -86,19 +89,22 @@ public class DeleteFdnContactScreen extends Activity {
         }
     }
 
-    private void resolveIntent() {
+    protected void resolveIntent() {
         Intent intent = getIntent();
 
         mName =  intent.getStringExtra(INTENT_EXTRA_NAME);
         mNumber =  intent.getStringExtra(INTENT_EXTRA_NUMBER);
-
+        mSubscription = getIntent().getIntExtra(SUBSCRIPTION_KEY, 0);
         if (TextUtils.isEmpty(mNumber)) {
             finish();
         }
     }
 
-    private void deleteContact() {
+    protected void deleteContact() {
+        String[] fdn = {"fdn", "fdn_sub2", "fdn_sub3"};
         StringBuilder buf = new StringBuilder();
+        Uri uri = null;
+
         if (TextUtils.isEmpty(mName)) {
             buf.append("number='");
         } else {
@@ -111,7 +117,11 @@ public class DeleteFdnContactScreen extends Activity {
         buf.append(mPin2);
         buf.append("'");
 
-        Uri uri = Uri.parse("content://icc/fdn");
+        if (mSubscription < TelephonyManager.getDefault().getPhoneCount()) {
+            uri = Uri.parse("content://icc/" + fdn[mSubscription]);
+        } else {
+            Log.e(LOG_TAG, "Error received invalid sub =" + mSubscription);
+        }
 
         mQueryHandler = new QueryHandler(getContentResolver());
         mQueryHandler.startDelete(0, null, uri, buf.toString(), null);
@@ -124,7 +134,7 @@ public class DeleteFdnContactScreen extends Activity {
         startActivityForResult(intent, PIN2_REQUEST_CODE);
     }
 
-    private void displayProgress(boolean flag) {
+    protected void displayProgress(boolean flag) {
         getWindow().setFeatureInt(
                 Window.FEATURE_INDETERMINATE_PROGRESS,
                 flag ? PROGRESS_VISIBILITY_ON : PROGRESS_VISIBILITY_OFF);
@@ -157,7 +167,7 @@ public class DeleteFdnContactScreen extends Activity {
 
     }
 
-    private class QueryHandler extends AsyncQueryHandler {
+    protected class QueryHandler extends AsyncQueryHandler {
         public QueryHandler(ContentResolver cr) {
             super(cr);
         }
@@ -183,7 +193,7 @@ public class DeleteFdnContactScreen extends Activity {
 
     }
 
-    private void log(String msg) {
+    protected void log(String msg) {
         Log.d(LOG_TAG, "[DeleteFdnContact] " + msg);
     }
 }

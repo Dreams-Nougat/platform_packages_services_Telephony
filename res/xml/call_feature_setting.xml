@@ -17,6 +17,18 @@
     xmlns:phone="http://schemas.android.com/apk/res/com.android.phone"
     android:title="@string/call_settings">
 
+    <!-- target class is com.android.phone.MultiSimSetting -->
+    <PreferenceScreen
+        android:key="button_call_independent_serv"
+        android:title="@string/callind_multi_sim"
+        android:persistent="false">
+
+        <intent android:action="android.intent.action.MAIN"
+            android:targetPackage="com.android.phone"
+            android:targetClass="com.android.phone.SelectSubscription" />
+
+    </PreferenceScreen>
+
     <PreferenceCategory
         android:key="button_ringtone_category_key"
         android:title="@string/preference_category_ringtone"
