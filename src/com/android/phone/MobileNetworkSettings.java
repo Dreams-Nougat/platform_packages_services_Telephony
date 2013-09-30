@@ -44,6 +44,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.MenuItem;
 
+import static com.android.internal.telephony.PhoneConstants.SUBSCRIPTION_KEY;
+
 /**
  * "Mobile network settings" screen.  This preference screen lets you
  * enable/disable mobile data, and control data roaming and other
@@ -91,6 +93,7 @@ public class MobileNetworkSettings extends PreferenceActivity
     private Phone mPhone;
     private MyHandler mHandler;
     private boolean mOkClicked;
+    private int mSubscription;
 
     //GsmUmts options and Cdma options
     GsmUmtsOptions mGsmUmtsOptions;
@@ -171,6 +174,7 @@ public class MobileNetworkSettings extends PreferenceActivity
             return true;
         } else if (preference == mButtonDataEnabled) {
             if (DBG) log("onPreferenceTreeClick: preference == mButtonDataEnabled.");
+            multiSimSetMobileData(mButtonDataEnabled.isChecked(), mSubscription);
             ConnectivityManager cm =
                     (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
 
@@ -214,9 +218,14 @@ public class MobileNetworkSettings extends PreferenceActivity
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
 
+        PhoneGlobals app = PhoneGlobals.getInstance();
+
         addPreferencesFromResource(R.xml.network_setting);
 
-        mPhone = PhoneGlobals.getPhone();
+        mSubscription = getIntent().getIntExtra(SUBSCRIPTION_KEY, app.getDefaultSubscription());
+        log("Settings onCreate subscription =" + mSubscription);
+        mPhone = app.getPhone(mSubscription);
+
         mHandler = new MyHandler();
 
         try {
@@ -255,7 +264,7 @@ public class MobileNetworkSettings extends PreferenceActivity
                     preferredNetworkMode);
             mButtonPreferredNetworkMode.setValue(Integer.toString(settingsNetworkMode));
             mCdmaOptions = new CdmaOptions(this, prefSet, mPhone);
-            mGsmUmtsOptions = new GsmUmtsOptions(this, prefSet);
+            mGsmUmtsOptions = new GsmUmtsOptions(this, prefSet, mSubscription);
         } else {
             prefSet.removePreference(mButtonPreferredNetworkMode);
             int phoneType = mPhone.getPhoneType();
@@ -298,7 +307,7 @@ public class MobileNetworkSettings extends PreferenceActivity
                     mButtonEnabledNetworks.setEntryValues(
                             R.array.enabled_networks_values);
                 }
-                mGsmUmtsOptions = new GsmUmtsOptions(this, prefSet);
+                mGsmUmtsOptions = new GsmUmtsOptions(this, prefSet, mSubscription);
             } else {
                 throw new IllegalStateException("Unexpected phone type: " + phoneType);
             }
@@ -345,9 +354,7 @@ public class MobileNetworkSettings extends PreferenceActivity
         // preferences.
         getPreferenceScreen().setEnabled(true);
 
-        ConnectivityManager cm =
-                (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
-        mButtonDataEnabled.setChecked(cm.getMobileDataEnabled());
+        mButtonDataEnabled.setChecked(multiSimGetMobileData(mSubscription));
 
         // Set UI state in onResume because a user could go home, launch some
         // app to change this setting's backend, and re-launch this settings app
@@ -771,4 +778,58 @@ public class MobileNetworkSettings extends PreferenceActivity
         }
         return super.onOptionsItemSelected(item);
     }
+
+    // Get Data roaming flag, from DB, as per SUB.
+    private boolean multiSimGetDataRoaming(int sub) {
+        boolean enabled;
+
+        enabled = android.provider.Settings.Global.getInt(mPhone.getContext().getContentResolver(),
+                android.provider.Settings.Global.DATA_ROAMING + sub, 0) != 0;
+        log("Get Data Roaming for SUB-" + sub + " is " + enabled);
+        return enabled;
+    }
+
+    // Set Data roaming flag, in DB, as per SUB.
+    private void multiSimSetDataRoaming(boolean enabled, int sub) {
+        // as per SUB, set the individual flag
+        android.provider.Settings.Global.putInt(mPhone.getContext().getContentResolver(),
+                android.provider.Settings.Global.DATA_ROAMING + sub, enabled ? 1 : 0);
+        log("Set Data Roaming for SUB-" + sub + " is " + enabled);
+
+        // If current DDS is this SUB, update the Global flag also
+        if (sub == android.telephony.TelephonyManager.
+                getDefault().getPreferredDataSubscription()) {
+            mPhone.setDataRoamingEnabled(enabled);
+            log("Set Data Roaming for DDS-" + sub + " is " + enabled);
+        }
+    }
+
+    // Get Mobile Data flag, from DB, as per SUB.
+    private boolean multiSimGetMobileData(int sub) {
+        boolean enabled;
+
+        enabled = android.provider.Settings.Global.getInt(mPhone.getContext().getContentResolver(),
+                android.provider.Settings.Global.MOBILE_DATA + sub, 0) != 0;
+        log("Get Mobile Data for SUB-" + sub + " is " + enabled);
+        return enabled;
+    }
+
+    // Set Mobile Data option, in DB, as per SUB.
+    private void multiSimSetMobileData(boolean enabled, int sub) {
+        // as per SUB, set the individual flag
+        android.provider.Settings.Global.putInt(mPhone.getContext().getContentResolver(),
+                android.provider.Settings.Global.MOBILE_DATA + sub, enabled ? 1 : 0);
+        log("Set Mobile Data for SUB-" + sub + " is " + enabled);
+
+        // If current DDS is this SUB, update the Global flag also
+        if (sub == android.telephony.TelephonyManager.
+                getDefault().getPreferredDataSubscription()) {
+            ConnectivityManager cm =
+                    (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+            cm.setMobileDataEnabled(enabled);
+            log("Set Mobile Data for DDS-" + sub + " is " + enabled);
+        }
+    }
+
+
 }

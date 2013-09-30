@@ -268,4 +268,27 @@ class CallCommandService extends ICallCommandService.Stub {
         }
     }
 
+    @Override
+    public void setActiveSubscription(int subscriptionId) {
+        try {
+            // Active subscription got changed from UI, call setAudioMode
+            // which informs LCH state to RIL and updates audio state of subs.
+            PhoneUtils.setActiveSubscription(subscriptionId);
+            mCallManager.setAudioMode();
+        } catch (Exception e) {
+            Log.e(TAG, "Error during setActiveSubscription().", e);
+        }
+    }
+
+    @Override
+    public int getActiveSubscription() {
+        int subscriptionId = PhoneConstants.INVALID_SUBSCRIPTION;
+
+        try {
+            subscriptionId = PhoneUtils.getActiveSubscription();
+        } catch (Exception e) {
+            Log.e(TAG, "Error during getActiveSubscription().", e);
+        }
+        return subscriptionId;
+    }
 }

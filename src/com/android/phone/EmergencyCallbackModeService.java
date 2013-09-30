@@ -41,6 +41,8 @@ import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
 
+import static com.android.internal.telephony.PhoneConstants.SUBSCRIPTION_KEY;
+
 /**
  * Application service that inserts/removes Emergency Callback Mode notification and
  * updates Emergency Callback Mode countdown clock in the notification
@@ -58,6 +60,7 @@ public class EmergencyCallbackModeService extends Service {
     private long mTimeLeft = 0;
     private Phone mPhone = null;
     private boolean mInEmergencyCall = false;
+    private int mSubscription = 0;
 
     private static final int ECM_TIMER_RESET = 1;
 
@@ -73,10 +76,25 @@ public class EmergencyCallbackModeService extends Service {
 
     @Override
     public void onCreate() {
-        // Check if it is CDMA phone
-        if (PhoneFactory.getDefaultPhone().getPhoneType() != PhoneConstants.PHONE_TYPE_CDMA) {
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        PhoneGlobals app = PhoneGlobals.getInstance();
+
+        if (intent != null) {
+            mSubscription = intent.getIntExtra(SUBSCRIPTION_KEY, app.getDefaultSubscription());
+        } else {
+            Log.e(LOG_TAG, "onStartCommand: intent null");
+        }
+
+        mPhone = app.getPhone(mSubscription);
+
+        // Check if it is GSM phone, as GSM phone does not support ECBM
+        if (mPhone.getPhoneType() != PhoneConstants.PHONE_TYPE_CDMA) {
             Log.e(LOG_TAG, "Error! Emergency Callback Mode not supported for " +
-                    PhoneFactory.getDefaultPhone().getPhoneName() + " phones");
+                    mPhone.getPhoneName() + " phones");
             stopSelf();
         }
 
@@ -89,10 +107,11 @@ public class EmergencyCallbackModeService extends Service {
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
         // Register ECM timer reset notfication
-        mPhone = PhoneFactory.getDefaultPhone();
         mPhone.registerForEcmTimerReset(mHandler, ECM_TIMER_RESET, null);
 
         startTimerNotification();
+
+        return START_STICKY;
     }
 
     @Override
@@ -168,6 +187,8 @@ public class EmergencyCallbackModeService extends Service {
                 R.drawable.picture_emergency25x25,
                 getText(R.string.phone_entered_ecm_text), 0);
 
+        Intent intent = new Intent(EmergencyCallbackModeExitDialog.ACTION_SHOW_ECM_EXIT_DIALOG);
+        intent.putExtra(SUBSCRIPTION_KEY, mSubscription);
         // PendingIntent to launch Emergency Callback Mode Exit activity if the user selects
         // this notification
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0,

@@ -46,6 +46,7 @@ import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
+import android.preference.PreferenceCategory;
 import android.preference.PreferenceGroup;
 import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
@@ -63,6 +64,7 @@ import android.view.MenuItem;
 import android.view.WindowManager;
 import android.widget.ListAdapter;
 
+import android.telephony.TelephonyManager;
 import com.android.internal.telephony.CallForwardInfo;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Phone;
@@ -76,6 +78,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
+import static com.android.internal.telephony.PhoneConstants.SUB_SETTING;
+import static com.android.internal.telephony.PhoneConstants.SUBSCRIPTION_KEY;
 
 /**
  * Top level "Call settings" UI; see res/xml/call_feature_setting.xml
@@ -193,6 +198,9 @@ public class CallFeaturesSetting extends PreferenceActivity
             "sip_call_options_wifi_only_key";
     private static final String SIP_SETTINGS_CATEGORY_KEY =
             "sip_settings_category_key";
+    private static final String BUTTON_SELECT_SUB_KEY  = "button_call_independent_serv";
+    private static final String BUTTON_CF_EXPAND_KEY = "button_cf_expand_key";
+    private static final String BUTTON_MORE_EXPAND_KEY = "button_more_expand_key";
 
     private Intent mContactListIntent;
 
@@ -246,6 +254,14 @@ public class CallFeaturesSetting extends PreferenceActivity
     // voicemail notification vibration string constants
     private static final String VOICEMAIL_VIBRATION_ALWAYS = "always";
     private static final String VOICEMAIL_VIBRATION_NEVER = "never";
+
+    private PreferenceScreen mSubscriptionPrefFDN;
+    private PreferenceScreen mSubscriptionPrefGSM;
+    private PreferenceScreen mSubscriptionPrefCDMA;
+    private PreferenceScreen mSubscriptionPrefEXPAND;
+    private PreferenceScreen mSubscriptionPrefMOREEXPAND;
+
+    private int mSubscription = 0;
 
     private EditPhoneNumberPreference mSubMenuVoicemailSettings;
 
@@ -1501,9 +1517,16 @@ public class CallFeaturesSetting extends PreferenceActivity
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
         if (DBG) log("onCreate(). Intent: " + getIntent());
-        mPhone = PhoneGlobals.getPhone();
+
+        // getting selected subscription
+        mSubscription = getIntent().getIntExtra(SUBSCRIPTION_KEY, 0);
+        boolean isSubSettings = getIntent().getBooleanExtra(SUB_SETTING, false);
+        boolean isMultiSIMEnabled = TelephonyManager.getDefault().isMultiSimEnabled();
 
         addPreferencesFromResource(R.xml.call_feature_setting);
+
+        log("settings onCreate subscription =" + mSubscription);
+        mPhone = PhoneGlobals.getInstance().getPhone(mSubscription);
 
         mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
@@ -1605,7 +1628,15 @@ public class CallFeaturesSetting extends PreferenceActivity
                     addPreferencesFromResource(R.xml.cdma_call_privacy);
                 }
             } else if (phoneType == PhoneConstants.PHONE_TYPE_GSM) {
-                addPreferencesFromResource(R.xml.gsm_umts_call_options);
+                if ((!isMultiSIMEnabled) || (isMultiSIMEnabled && isSubSettings)) {
+                    addPreferencesFromResource(R.xml.gsm_umts_call_options);
+
+                    mSubscriptionPrefEXPAND = (PreferenceScreen) findPreference(BUTTON_CF_EXPAND_KEY);
+                    mSubscriptionPrefMOREEXPAND =
+                            (PreferenceScreen) findPreference(BUTTON_MORE_EXPAND_KEY);
+                    mSubscriptionPrefEXPAND.getIntent().putExtra(SUBSCRIPTION_KEY, mSubscription);
+                    mSubscriptionPrefMOREEXPAND.getIntent().putExtra(SUBSCRIPTION_KEY, mSubscription);
+                }
             } else {
                 throw new IllegalStateException("Unexpected phone type: " + phoneType);
             }
@@ -1659,6 +1690,82 @@ public class CallFeaturesSetting extends PreferenceActivity
             actionBar.setDisplayShowHomeEnabled(true);
             actionBar.setDisplayHomeAsUpEnabled(true);
             actionBar.setDisplayShowTitleEnabled(true);
+        }
+
+        if (isMultiSIMEnabled) {
+            if (!isSubSettings) {
+                PreferenceCategory ringTone
+                       = (PreferenceCategory)findPreference("button_ringtone_category_key");
+                if (ringTone != null) {
+                    ringTone.removeAll();
+                    prefSet.removePreference(ringTone);
+                }
+                PreferenceScreen voiceMail
+                        = (PreferenceScreen)findPreference("button_voicemail_category_key");
+                if (voiceMail != null) {
+                    voiceMail.removeAll();
+                    prefSet.removePreference(voiceMail);
+                }
+                PreferenceCategory miscCat
+                        = (PreferenceCategory)findPreference("button_misc_category_key");
+                if (miscCat != null) {
+                    prefSet.removePreference(miscCat);
+                }
+
+                mSubscriptionPrefFDN  = (PreferenceScreen) findPreference(BUTTON_FDN_KEY);
+                if (mSubscriptionPrefFDN != null) {
+                    prefSet.removePreference(mSubscriptionPrefFDN);
+                }
+                mSubscriptionPrefGSM  = (PreferenceScreen) findPreference(BUTTON_GSM_UMTS_OPTIONS);
+                if (mSubscriptionPrefGSM != null) {
+                    prefSet.removePreference(mSubscriptionPrefGSM);
+                }
+                mSubscriptionPrefCDMA = (PreferenceScreen) findPreference(BUTTON_CDMA_OPTIONS);
+                if (mSubscriptionPrefCDMA != null) {
+                    prefSet.removePreference(mSubscriptionPrefCDMA);
+                }
+            } else {
+                if (mPlayDtmfTone != null) {
+                    prefSet.removePreference(mPlayDtmfTone);
+                }
+                if (mButtonAutoRetry != null) {
+                    prefSet.removePreference(mButtonAutoRetry);
+                }
+                if (mButtonTTY != null) {
+                    prefSet.removePreference(mButtonTTY);
+                }
+                if (mButtonHAC != null) {
+                    prefSet.removePreference(mButtonHAC);
+                }
+                if (mButtonDTMF != null) {
+                    prefSet.removePreference(mButtonDTMF);
+                }
+                mSubscriptionPrefFDN  = (PreferenceScreen) findPreference(BUTTON_FDN_KEY);
+                if (mSubscriptionPrefFDN != null) {
+                    mSubscriptionPrefFDN.getIntent().putExtra(SUBSCRIPTION_KEY, mSubscription);
+                }
+                mSubscriptionPrefGSM  = (PreferenceScreen) findPreference(BUTTON_GSM_UMTS_OPTIONS);
+                if (mSubscriptionPrefGSM != null) {
+                    mSubscriptionPrefGSM.getIntent().putExtra(SUBSCRIPTION_KEY, mSubscription);
+                }
+                mSubscriptionPrefCDMA = (PreferenceScreen) findPreference(BUTTON_CDMA_OPTIONS);
+                if (mSubscriptionPrefCDMA != null) {
+                    mSubscriptionPrefCDMA.getIntent().putExtra(SUBSCRIPTION_KEY, mSubscription);
+                }
+            }
+        }
+
+        PreferenceScreen selectSub = (PreferenceScreen) findPreference(BUTTON_SELECT_SUB_KEY);
+        if (selectSub != null) {
+            if (isMultiSIMEnabled && !isSubSettings) {
+                Intent intent = selectSub.getIntent();
+                intent.putExtra(SelectSubscription.PACKAGE, "com.android.phone");
+                intent.putExtra(SelectSubscription.TARGET_CLASS,
+                        "com.android.phone.CallFeaturesSetting");
+                intent.putExtra(SUB_SETTING, true);
+            } else {
+                prefSet.removePreference(selectSub);
+            }
         }
     }
 
@@ -1801,9 +1908,9 @@ public class CallFeaturesSetting extends PreferenceActivity
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(
                 mPhone.getContext());
-        if (migrateVoicemailVibrationSettingsIfNeeded(prefs)) {
+        if (migrateVoicemailVibrationSettingsIfNeeded(prefs,  mPhone.getSubscription())) {
             mVoicemailNotificationVibrate.setChecked(prefs.getBoolean(
-                    BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_KEY, false));
+                    BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_KEY + mPhone.getSubscription(), false));
         }
 
         lookupRingtoneName();
@@ -1827,6 +1934,30 @@ public class CallFeaturesSetting extends PreferenceActivity
         }
         return false;
     }
+
+    // Migrate settings from BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_WHEN_KEY to
+    // BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_KEY, if the latter does not exist.
+    // Returns true if migration was performed.
+    public static boolean migrateVoicemailVibrationSettingsIfNeeded(SharedPreferences prefs,
+            int subscripton) {
+        if (!prefs.contains(BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_KEY + subscripton)) {
+            String vibrateWhen = prefs.getString(
+                    BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_WHEN_KEY + +subscripton,
+                    VOICEMAIL_VIBRATION_NEVER);
+            // If vibrateWhen is always, then voicemailVibrate should be True.
+            // otherwise if vibrateWhen is "only in silent mode", or "never",
+            // then
+            // voicemailVibrate = False.
+            boolean voicemailVibrate = vibrateWhen.equals(VOICEMAIL_VIBRATION_ALWAYS);
+            final SharedPreferences.Editor editor = prefs.edit();
+            editor.putBoolean(BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_KEY + subscripton,
+                    voicemailVibrate);
+            editor.commit();
+            return true;
+        }
+        return false;
+    }
+
 
     /**
      * Obtain the setting for "vibrate when ringing" setting.
