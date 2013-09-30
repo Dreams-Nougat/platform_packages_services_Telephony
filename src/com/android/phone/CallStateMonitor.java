@@ -23,6 +23,8 @@ import android.os.SystemProperties;
 import android.util.Log;
 
 import com.android.internal.telephony.CallManager;
+import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneConstants;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -57,11 +59,12 @@ class CallStateMonitor extends Handler {
     public static final int PHONE_RINGBACK_TONE = 11;
     public static final int PHONE_RESEND_MUTE = 12;
     public static final int PHONE_ON_DIAL_CHARS = 13;
+    public static final int PHONE_ACTIVE_SUBSCRIPTION_CHANGE = 15;
 
     // Other events from call manager
     public static final int EVENT_OTA_PROVISION_CHANGE = 20;
 
-    private CallManager callManager;
+    protected CallManager callManager;
     private ArrayList<Handler> registeredHandlers;
 
     // Events generated internally:
@@ -75,7 +78,7 @@ class CallStateMonitor extends Handler {
     /**
      * Register for call state notifications with the CallManager.
      */
-    private void registerForNotifications() {
+    protected void registerForNotifications() {
         callManager.registerForNewRingingConnection(this, PHONE_NEW_RINGING_CONNECTION, null);
         callManager.registerForPreciseCallStateChanged(this, PHONE_STATE_CHANGED, null);
         callManager.registerForDisconnect(this, PHONE_DISCONNECT, null);
@@ -90,6 +93,17 @@ class CallStateMonitor extends Handler {
         callManager.registerForRingbackTone(this, PHONE_RINGBACK_TONE, null);
         callManager.registerForResendIncallMute(this, PHONE_RESEND_MUTE, null);
         callManager.registerForPostDialCharacter(this, PHONE_ON_DIAL_CHARS, null);
+
+        for (Phone phone : callManager.getAllPhones()) {
+            if (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
+                Log.d(LOG_TAG, "register for cdma call waiting " + phone.getSubscription());
+                callManager.registerForCallWaiting(this, PHONE_CDMA_CALL_WAITING,
+                        phone.getSubscription());
+                break;
+            }
+        }
+        callManager.registerForSubscriptionChange(this, PHONE_ACTIVE_SUBSCRIPTION_CHANGE, null);
+
     }
 
     public void addListener(Handler handler) {
@@ -120,6 +134,7 @@ class CallStateMonitor extends Handler {
         if (DBG) Log.d(LOG_TAG, "updateCallNotifierRegistrationsAfterRadioTechnologyChange...");
 
         // Unregister all events from the old obsolete phone
+        callManager.unregisterForSubscriptionChange(this);
         callManager.unregisterForNewRingingConnection(this);
         callManager.unregisterForPreciseCallStateChanged(this);
         callManager.unregisterForDisconnect(this);
