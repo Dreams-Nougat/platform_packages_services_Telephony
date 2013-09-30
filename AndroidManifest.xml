@@ -109,6 +109,11 @@
                       android:exported="true"
                       android:readPermission="android.permission.READ_CONTACTS"
                       android:writePermission="android.permission.WRITE_CONTACTS" />
+            <provider android:name="MSimIccProvider"
+                      android:authorities="iccmsim"
+                      android:multiprocess="true"
+                      android:readPermission="android.permission.READ_CONTACTS"
+                      android:writePermission="android.permission.WRITE_CONTACTS" />
 
         <!-- Dialer UI that only allows emergency calls -->
         <activity android:name="EmergencyDialer"
@@ -141,6 +146,20 @@
             </intent-filter>
         </activity>
 
+<!-- TODO:QC MSimContacts -->
+
+        <activity android:name="MSimContacts"
+            android:label="@string/simContacts_title"
+            android:theme="@style/SimImportTheme"
+            android:icon="@mipmap/ic_launcher_contacts">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="vnd.android.cursor.item/sim-contact" />
+            </intent-filter>
+        </activity>
+
         <activity android:name="FdnList"
                 android:label="@string/fdnListLabel"
                 android:theme="@style/SettingsLight">
@@ -149,6 +168,19 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="vnd.android.cursor.item/sim-contact" />
             </intent-filter>
+        </activity>
+
+        <activity android:name="MSimFdnList" android:label="@string/fdnListLabel">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="vnd.android.cursor.item/sim-contact" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name="MSimDialerActivity"
+                android:permission="android.permission.CALL_PRIVILEGED"
+                android:configChanges="orientation|keyboardHidden">
         </activity>
 
         <activity android:name="OutgoingCallBroadcaster"
@@ -246,6 +278,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
+
+        <activity android:name="MSimInCallScreen"
+            android:theme="@style/Theme.InCallScreen"
+            android:label="@string/phoneIconLabel"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:screenOrientation="nosensor"
+            android:configChanges="keyboardHidden"
+            android:exported="false">
+        </activity>
 
         <!-- Trampoline activity that handles the PERFORM_CDMA_PROVISIONING intent. -->
         <activity android:name="InCallScreenShowActivation"
@@ -395,9 +437,17 @@
                 android:windowSoftInputMode="stateVisible">
         </activity>
 
+        <activity android:name="MSimEditFdnContactScreen"
+                  android:windowSoftInputMode="stateVisible">
+        </activity>
+
         <activity android:name="DeleteFdnContactScreen"
                 android:theme="@style/SettingsLight"
                 android:label="@string/delete_fdn_contact">
+        </activity>
+
+        <activity android:name="MSimDeleteFdnContactScreen"
+        android:label="@string/delete_fdn_contact">
         </activity>
 
         <activity android:name="DataRoamingReenable" android:label="@string/android:dialog_alert_title"
@@ -413,6 +463,18 @@
                 android:theme="@android:style/Theme.Holo.DialogWhenLarge">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+
+        <!-- Select Subscription -->
+        <activity android:name="SelectSubscription"
+            android:label="@string/callind_multi_sim"
+            android:configChanges="orientation|keyboardHidden"
+            android:theme="@android:style/Theme.Holo.DialogWhenLarge">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -548,6 +610,15 @@
 
         <!-- service to dump telephony information -->
         <service android:name="HfaService" android:exported="false"/>
+
+        <activity android:name="SetSubscription"
+            android:label="@string/set_subscription"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:configChanges="orientation|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
 
     </application>
 </manifest>
