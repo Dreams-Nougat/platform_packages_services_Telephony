@@ -38,6 +38,7 @@ import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.CommonDataKinds.StructuredName;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.RawContacts;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -245,11 +246,21 @@ public class SimContacts extends ADNList {
 
     @Override
     protected Uri resolveIntent() {
+        String[] adn = {"adn", "adn_sub2", "adn_sub3"};
         Intent intent = getIntent();
-        intent.setData(Uri.parse("content://icc/adn"));
+        int sub = TelephonyManager.getDefault().getPreferredVoiceSubscription();
+
+        if (sub < TelephonyManager.getDefault().getPhoneCount()) {
+            intent.setData(Uri.parse("content://icc/" + adn[sub]));
+        } else {
+            Log.e(LOG_TAG, "Error: received invalid sub =" + sub);
+        }
+
         if (Intent.ACTION_PICK.equals(intent.getAction())) {
             // "index" is 1-based
             mInitialSelection = intent.getIntExtra("index", 0) - 1;
+        } else if (Intent.ACTION_VIEW.equals(intent.getAction())) {
+            mInitialSelection = 0;
         }
         return intent.getData();
     }
