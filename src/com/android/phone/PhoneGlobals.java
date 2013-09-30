@@ -50,6 +50,7 @@ import android.os.UpdateLock;
 import android.os.UserHandle;
 import android.preference.PreferenceManager;
 import android.provider.Settings.System;
+import android.telephony.TelephonyManager;
 import android.telephony.ServiceState;
 import android.text.TextUtils;
 import android.util.Log;
@@ -98,23 +99,23 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
      *
      * ***** DO NOT SUBMIT WITH DBG_LEVEL > 0 *************
      */
-    /* package */ static final int DBG_LEVEL = 0;
+    /* package */ static final int DBG_LEVEL = 2;
 
     private static final boolean DBG =
             (PhoneGlobals.DBG_LEVEL >= 1) && (SystemProperties.getInt("ro.debuggable", 0) == 1);
     private static final boolean VDBG = (PhoneGlobals.DBG_LEVEL >= 2);
 
     // Message codes; see mHandler below.
-    private static final int EVENT_SIM_NETWORK_LOCKED = 3;
-    private static final int EVENT_SIM_STATE_CHANGED = 8;
+    protected static final int EVENT_SIM_NETWORK_LOCKED = 3;
+    protected static final int EVENT_SIM_STATE_CHANGED = 8;
     private static final int EVENT_DATA_ROAMING_DISCONNECTED = 10;
     private static final int EVENT_DATA_ROAMING_OK = 11;
     private static final int EVENT_UNSOL_CDMA_INFO_RECORD = 12;
     private static final int EVENT_DOCK_STATE_CHANGED = 13;
-    private static final int EVENT_TTY_PREFERRED_MODE_CHANGED = 14;
+    protected static final int EVENT_TTY_PREFERRED_MODE_CHANGED = 14;
     private static final int EVENT_TTY_MODE_GET = 15;
     private static final int EVENT_TTY_MODE_SET = 16;
-    private static final int EVENT_START_SIP_SERVICE = 17;
+    protected static final int EVENT_START_SIP_SERVICE = 17;
 
     // The MMI codes are also used by the InCallScreen.
     public static final int MMI_INITIATE = 51;
@@ -157,7 +158,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     public static final String ACTION_SEND_SMS_FROM_NOTIFICATION =
             "com.android.phone.ACTION_SEND_SMS_FROM_NOTIFICATION";
 
-    private static PhoneGlobals sMe;
+    protected static PhoneGlobals sMe;
 
     // A few important fields we expose to the rest of the package
     // directly (rather than thru set/get methods) for efficiency.
@@ -169,17 +170,17 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     Phone phone;
     PhoneInterfaceManager phoneMgr;
 
-    private AudioRouter audioRouter;
-    private BluetoothManager bluetoothManager;
-    private CallCommandService callCommandService;
-    private CallGatewayManager callGatewayManager;
-    private CallHandlerServiceProxy callHandlerServiceProxy;
-    private CallModeler callModeler;
-    private CallStateMonitor callStateMonitor;
-    private DTMFTonePlayer dtmfTonePlayer;
-    private IBluetoothHeadsetPhone mBluetoothPhone;
-    private Ringer ringer;
-    private WiredHeadsetManager wiredHeadsetManager;
+    protected AudioRouter audioRouter;
+    protected BluetoothManager bluetoothManager;
+    protected CallCommandService callCommandService;
+    protected CallGatewayManager callGatewayManager;
+    protected CallHandlerServiceProxy callHandlerServiceProxy;
+    protected CallModeler callModeler;
+    protected CallStateMonitor callStateMonitor;
+    protected DTMFTonePlayer dtmfTonePlayer;
+    protected IBluetoothHeadsetPhone mBluetoothPhone;
+    protected Ringer ringer;
+    protected WiredHeadsetManager wiredHeadsetManager;
 
     static int mDockState = Intent.EXTRA_DOCK_STATE_UNDOCKED;
     static boolean sVoiceCapable = true;
@@ -191,7 +192,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     // Normally, these are the Emergency Dialer and the subsequent
     // progress dialog.  null if there is are no such objects in
     // the foreground.
-    private Activity mPUKEntryActivity;
+    protected Activity mPUKEntryActivity;
     private ProgressDialog mPUKEntryProgressDialog;
 
     private boolean mIsSimPinEnabled;
@@ -201,17 +202,17 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     private boolean mBeginningCall;
 
     // Last phone state seen by updatePhoneState()
-    private PhoneConstants.State mLastPhoneState = PhoneConstants.State.IDLE;
+    protected PhoneConstants.State mLastPhoneState = PhoneConstants.State.IDLE;
 
     private WakeState mWakeState = WakeState.SLEEP;
 
-    private PowerManager mPowerManager;
-    private IPowerManager mPowerManagerService;
-    private PowerManager.WakeLock mWakeLock;
-    private PowerManager.WakeLock mPartialWakeLock;
-    private KeyguardManager mKeyguardManager;
+    protected PowerManager mPowerManager;
+    protected IPowerManager mPowerManagerService;
+    protected PowerManager.WakeLock mWakeLock;
+    protected PowerManager.WakeLock mPartialWakeLock;
+    protected KeyguardManager mKeyguardManager;
 
-    private UpdateLock mUpdateLock;
+    protected UpdateLock mUpdateLock;
 
     // Broadcast receiver for various intent broadcasts (see onCreate())
     private final BroadcastReceiver mReceiver = new PhoneAppBroadcastReceiver();
@@ -220,7 +221,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     private final BroadcastReceiver mMediaButtonReceiver = new MediaButtonBroadcastReceiver();
 
     /** boolean indicating restoring mute state on InCallScreen.onResume() */
-    private boolean mShouldRestoreMuteOnInCallResume;
+    protected boolean mShouldRestoreMuteOnInCallResume;
 
     /**
      * The singleton OtaUtils instance used for OTASP calls.
@@ -243,9 +244,9 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     public OtaUtils.CdmaOtaInCallScreenUiState cdmaOtaInCallScreenUiState;
 
     // TTY feature enabled on this platform
-    private boolean mTtyEnabled;
+    protected boolean mTtyEnabled;
     // Current TTY operating mode selected by user
-    private int mPreferredTtyMode = Phone.TTY_MODE_OFF;
+    protected int mPreferredTtyMode = Phone.TTY_MODE_OFF;
 
     /**
      * Set the restore mute state flag. Used when we are setting the mute state
@@ -629,7 +630,6 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         return phone;
     }
 
-
     Ringer getRinger() {
         return ringer;
     }
@@ -944,7 +944,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         return mKeyguardManager;
     }
 
-    private void onMMIComplete(AsyncResult r) {
+    protected void onMMIComplete(AsyncResult r) {
         if (VDBG) Log.d(LOG_TAG, "onMMIComplete()...");
         MmiCode mmiCode = (MmiCode) r.result;
         PhoneUtils.displayMMIComplete(phone, getInstance(), mmiCode, null, null);
@@ -1016,7 +1016,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     /**
      * Receiver for misc intent broadcasts the Phone app cares about.
      */
-    private class PhoneAppBroadcastReceiver extends BroadcastReceiver {
+    protected class PhoneAppBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -1099,7 +1099,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
      * adjust its IntentFilter's priority (to make sure we get these
      * intents *before* the media player.)
      */
-    private class MediaButtonBroadcastReceiver extends BroadcastReceiver {
+    protected class MediaButtonBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             KeyEvent event = (KeyEvent) intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
@@ -1190,7 +1190,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
 
         if (ss != null) {
             int state = ss.getState();
-            notificationMgr.updateNetworkSelection(state);
+            notificationMgr.updateNetworkSelection(state, phone);
         }
     }
 
@@ -1271,6 +1271,10 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         phone.queryTTYMode(mHandler.obtainMessage(EVENT_TTY_MODE_GET));
     }
 
+    /* package */ PhoneConstants.State getPhoneState(int subscription) {
+        return mLastPhoneState;
+    }
+
     /**
      * "Call origin" may be used by Contacts app to specify where the phone call comes from.
      * Currently, the only permitted value for this extra is {@link #ALLOWED_EXTRA_CALL_ORIGIN}.
@@ -1290,7 +1294,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     private static final long CALL_ORIGIN_EXPIRATION_MILLIS = 30 * 1000;
 
     /** Service connection */
-    private final ServiceConnection mBluetoothPhoneConnection = new ServiceConnection() {
+    protected final ServiceConnection mBluetoothPhoneConnection = new ServiceConnection() {
 
         /** Handle the task of binding the local object to the service */
         public void onServiceConnected(ComponentName className, IBinder service) {
@@ -1316,6 +1320,13 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
      * Gets User preferred Voice subscription setting
      */
     public int getVoiceSubscription() {
+        return DEFAULT_SUBSCRIPTION;
+    }
+
+    /**
+     * Get the subscription that has service
+     */
+    public int getVoiceSubscriptionInService() {
         return DEFAULT_SUBSCRIPTION;
     }
 
