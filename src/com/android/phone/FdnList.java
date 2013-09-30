@@ -21,21 +21,25 @@ import android.content.Intent;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Bundle;
+import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ListView;
 
+import static com.android.internal.telephony.MSimConstants.SUBSCRIPTION_KEY;
 /**
  * FDN List UI for the Phone app.
  */
 public class FdnList extends ADNList {
+    private int mSubscription = 0;
     private static final int MENU_ADD = 1;
     private static final int MENU_EDIT = 2;
     private static final int MENU_DELETE = 3;
 
-    private static final String INTENT_EXTRA_NAME = "name";
-    private static final String INTENT_EXTRA_NUMBER = "number";
+    protected static final String INTENT_EXTRA_NAME = "name";
+    protected static final String INTENT_EXTRA_NUMBER = "number";
 
     @Override
     public void onCreate(Bundle icicle) {
@@ -50,8 +54,16 @@ public class FdnList extends ADNList {
 
     @Override
     protected Uri resolveIntent() {
+        String[] fdn = {"fdn", "fdn_sub2", "fdn_sub3"};
         Intent intent = getIntent();
-        intent.setData(Uri.parse("content://icc/fdn"));
+        mSubscription = getIntent().getIntExtra(SUBSCRIPTION_KEY, 0);
+
+        // CAF_MSIM check and modify iccmsim to icc in IccProvider.java
+        if (mSubscription < TelephonyManager.getDefault().getPhoneCount()) {
+            intent.setData(Uri.parse("content://icc/" + fdn[mSubscription]));
+        } else {
+            Log.e(TAG, "Error received invalid sub =" + mSubscription);
+        }
         return intent.getData();
     }
 
@@ -116,10 +128,11 @@ public class FdnList extends ADNList {
         editSelected(position);
     }
 
-    private void addContact() {
+    protected void addContact() {
         // if we don't put extras "name" when starting this activity, then
         // EditFdnContactScreen treats it like add contact.
         Intent intent = new Intent();
+        intent.putExtra(SUBSCRIPTION_KEY, mSubscription);
         intent.setClass(this, EditFdnContactScreen.class);
         startActivity(intent);
     }
@@ -137,12 +150,13 @@ public class FdnList extends ADNList {
     /**
      * Edit the item at the selected position in the list.
      */
-    private void editSelected(int position) {
+    protected void editSelected(int position) {
         if (mCursor.moveToPosition(position)) {
             String name = mCursor.getString(NAME_COLUMN);
             String number = mCursor.getString(NUMBER_COLUMN);
 
             Intent intent = new Intent();
+            intent.putExtra(SUBSCRIPTION_KEY, mSubscription);
             intent.setClass(this, EditFdnContactScreen.class);
             intent.putExtra(INTENT_EXTRA_NAME, name);
             intent.putExtra(INTENT_EXTRA_NUMBER, number);
@@ -150,16 +164,22 @@ public class FdnList extends ADNList {
         }
     }
 
-    private void deleteSelected() {
+    protected void deleteSelected() {
         if (mCursor.moveToPosition(getSelectedItemPosition())) {
             String name = mCursor.getString(NAME_COLUMN);
             String number = mCursor.getString(NUMBER_COLUMN);
 
             Intent intent = new Intent();
+            intent.putExtra(SUBSCRIPTION_KEY, mSubscription);
             intent.setClass(this, DeleteFdnContactScreen.class);
             intent.putExtra(INTENT_EXTRA_NAME, name);
             intent.putExtra(INTENT_EXTRA_NUMBER, number);
             startActivity(intent);
         }
+    }
+
+    @Override
+    protected void log(String msg) {
+        Log.d(TAG, "[FdnList] " + msg);
     }
 }
