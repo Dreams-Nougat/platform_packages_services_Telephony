@@ -43,6 +43,8 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
 
+import static com.android.internal.telephony.MSimConstants.SUBSCRIPTION_KEY;
+
 /**
  * Displays dialog that enables users to exit Emergency Callback Mode
  *
@@ -149,6 +151,10 @@ public class EmergencyCallbackModeExitDialog extends Activity implements OnDismi
                 mEcmTimeout = mService.getEmergencyCallbackModeTimeout();
                 mInEmergencyCall = mService.getEmergencyCallbackModeCallState();
             }
+
+            int subscription = getIntent().getIntExtra(SUBSCRIPTION_KEY,
+                    PhoneGlobals.getInstance().getDefaultSubscription());
+            mPhone = PhoneGlobals.getInstance().getPhone(subscription);
 
             // Unbind from remote service
             unbindService(mConnection);
