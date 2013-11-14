@@ -141,6 +141,26 @@
         android:entries="@array/dtmf_tone_entries"
         android:entryValues="@array/dtmf_tone_values"/>
 
+    <CheckBoxPreference
+        android:key="button_enable_disable_cell_broadcast"
+        android:title="@string/cell_broadcast_title"
+        android:defaultValue="false"
+        android:summaryOn="@string/cell_broadcast_on"
+        android:summaryOff="@string/cell_broadcast_off"/>
+
+    <PreferenceScreen
+        android:key="button_cell_broadcast_settings"
+        android:dependency="button_enable_disable_cell_broadcast"
+        android:title="@string/cell_broadcast_settings_title"
+        android:persistent="false"
+        android:summary="@string/cell_broadcast_settings_description">
+
+        <intent android:action="android.intent.action.MAIN"
+            android:targetPackage="com.android.phone"
+            android:targetClass="com.android.phone.CellBroadcastSettings"
+            android:data="0"/>
+    </PreferenceScreen>
+
     <PreferenceScreen
         android:key="button_gsm_more_expand_key"
         android:title="@string/labelGSMMore"

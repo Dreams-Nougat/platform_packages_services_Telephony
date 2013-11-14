@@ -17,11 +17,14 @@
 package com.android.phone;
 
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.AsyncResult;
 import android.os.Bundle;
@@ -37,8 +40,13 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandException;
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.OperatorInfo;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyIntents;
 
 import java.util.HashMap;
 import java.util.List;
@@ -60,6 +68,8 @@ public class NetworkSetting extends PreferenceActivity
     private static final int DIALOG_NETWORK_SELECTION = 100;
     private static final int DIALOG_NETWORK_LIST_LOAD = 200;
     private static final int DIALOG_NETWORK_AUTO_SELECT = 300;
+    private static final int DIALOG_NETWORK_SEARCH_WARN = 400;
+    private static final int DIALOG_NETWORK_SEARCH_CONFIRM = 500;
 
     //String keys for preference lookup
     private static final String LIST_NETWORKS_KEY = "list_networks_key";
@@ -70,6 +80,7 @@ public class NetworkSetting extends PreferenceActivity
     private HashMap<Preference, OperatorInfo> mNetworkMap;
 
     Phone mPhone;
+	private int mSimId;
     protected boolean mIsForeground = false;
 
     /** message for network selection */
@@ -97,7 +108,12 @@ public class NetworkSetting extends PreferenceActivity
                     ar = (AsyncResult) msg.obj;
                     if (ar.exception != null) {
                         if (DBG) log("manual network selection: failed!");
-                        displayNetworkSelectionFailed(ar.exception);
+                        displayNetworkSelectionFailed(new CommandException(CommandException.Error.ILLEGAL_SIM_OR_ME));
+                        mHandler.postDelayed(new Runnable() {
+                            public void run() {
+                            selectNetworkAutomatic();
+                            }
+                        }, 2000);
                     } else {
                         if (DBG) log("manual network selection: succeeded!");
                         displayNetworkSelectionSucceeded();
@@ -142,21 +158,33 @@ public class NetworkSetting extends PreferenceActivity
     /** Local service interface */
     private INetworkQueryService mNetworkQueryService = null;
 
+	/** Local service interface */
+    private INetworkQueryService2 mNetworkQueryService2 = null;
+
     /** Service connection */
     private final ServiceConnection mNetworkQueryServiceConnection = new ServiceConnection() {
 
         /** Handle the task of binding the local object to the service */
         public void onServiceConnected(ComponentName className, IBinder service) {
             if (DBG) log("connection created, binding local service.");
-            mNetworkQueryService = ((NetworkQueryService.LocalBinder) service).getService();
+                if(mSimId == SimCardID.ID_ONE.toInt()) {
+                    mNetworkQueryService2 = ((NetworkQueryService2.LocalBinder) service).getService();
+                } else if (mSimId == SimCardID.ID_ZERO.toInt()) {
+                    mNetworkQueryService = ((NetworkQueryService.LocalBinder) service).getService();
+                }
+
             // as soon as it is bound, run a query.
-            loadNetworksList();
+            //loadNetworksList();
         }
 
         /** Handle the task of cleaning up the local binding */
         public void onServiceDisconnected(ComponentName className) {
             if (DBG) log("connection disconnected, cleaning local binding.");
-            mNetworkQueryService = null;
+            if (mSimId == SimCardID.ID_ONE.toInt()) {
+                mNetworkQueryService2 = null;
+            } else if (mSimId == SimCardID.ID_ZERO.toInt()) {
+                mNetworkQueryService = null;
+            }
         }
     };
 
@@ -175,12 +203,29 @@ public class NetworkSetting extends PreferenceActivity
         }
     };
 
+	/**
+     * This implementation of INetworkQueryServiceCallback2 is used to receive
+     * callback notifications from the network query service.
+     */
+    private final INetworkQueryServiceCallback2 mCallback2 = new INetworkQueryServiceCallback2.Stub() {
+
+        /** place the message on the looper queue upon query completion. */
+        public void onQueryComplete(List<OperatorInfo> networkInfoArray, int status) {
+            if (DBG) log("notifying message loop of query completion for SIM2.");
+            Message msg = mHandler.obtainMessage(EVENT_NETWORK_SCAN_COMPLETED,
+                    status, 0, networkInfoArray);
+            msg.sendToTarget();
+        }
+    };
+
     @Override
     public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference preference) {
         boolean handled = false;
 
         if (preference == mSearchButton) {
-            loadNetworksList();
+            if (isAllowedSearchNetworks()) {
+                loadNetworksList();
+            }
             handled = true;
         } else if (preference == mAutoSelect) {
             selectNetworkAutomatic();
@@ -206,7 +251,12 @@ public class NetworkSetting extends PreferenceActivity
     public void onCancel(DialogInterface dialog) {
         // request that the service stop the query with this callback object.
         try {
-            mNetworkQueryService.stopNetworkQuery(mCallback);
+        	if(mSimId == SimCardID.ID_ONE.toInt()){
+				mNetworkQueryService2.stopNetworkQuery(mCallback2);
+			}else if(mSimId == SimCardID.ID_ZERO.toInt()){
+				mNetworkQueryService.stopNetworkQuery(mCallback);
+			}
+            
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
@@ -226,7 +276,18 @@ public class NetworkSetting extends PreferenceActivity
 
         addPreferencesFromResource(R.xml.carrier_select);
 
-        mPhone = PhoneGlobals.getPhone();
+		String strSimId = getIntent().getDataString();
+        try {
+            mSimId = Integer.parseInt(strSimId);
+        } catch (NumberFormatException ex) {
+            mSimId = SimCardID.ID_ZERO.toInt();
+        }
+		
+		if(mSimId == SimCardID.ID_ONE.toInt()){
+			mPhone = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+		}else if(mSimId == SimCardID.ID_ZERO.toInt()){
+			mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
+		}
 
         mNetworkList = (PreferenceGroup) getPreferenceScreen().findPreference(LIST_NETWORKS_KEY);
         mNetworkMap = new HashMap<Preference, OperatorInfo>();
@@ -239,21 +300,35 @@ public class NetworkSetting extends PreferenceActivity
         // long as startService is called) until a stopservice request is made.  Since
         // we want this service to just stay in the background until it is killed, we
         // don't bother stopping it from our end.
-        startService (new Intent(this, NetworkQueryService.class));
-        bindService (new Intent(this, NetworkQueryService.class), mNetworkQueryServiceConnection,
-                Context.BIND_AUTO_CREATE);
+		if(mSimId == SimCardID.ID_ONE.toInt()){
+		    startService (new Intent(this, NetworkQueryService2.class));
+            bindService (new Intent(this, NetworkQueryService2.class), mNetworkQueryServiceConnection,
+                    Context.BIND_AUTO_CREATE);
+		}else if(mSimId == SimCardID.ID_ZERO.toInt()){
+            startService (new Intent(this, NetworkQueryService.class));
+            bindService (new Intent(this, NetworkQueryService.class), mNetworkQueryServiceConnection,
+                    Context.BIND_AUTO_CREATE);
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
         mIsForeground = true;
+
+        // BRCM SIM hot swap start
+        IntentFilter intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+        registerReceiver(mIccCardAbsentReceiver, intentFilter);
+        // BRCM SIM hot swap end
     }
 
     @Override
     public void onPause() {
         super.onPause();
         mIsForeground = false;
+
+        // BRCM SIM hot swap
+        unregisterReceiver(mIccCardAbsentReceiver);
     }
 
     /**
@@ -299,6 +374,28 @@ public class NetworkSetting extends PreferenceActivity
                     break;
             }
             return dialog;
+        } else if (id == DIALOG_NETWORK_SEARCH_WARN) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setMessage(R.string.network_search_not_allowed)
+            .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int whichButton) {
+                }
+            });
+            return builder.create();
+        } else if (id == DIALOG_NETWORK_SEARCH_CONFIRM) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setMessage(R.string.network_search_disconnect_warning)
+            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    log("User click yes, start query network.");
+                    loadNetworksList();
+                }
+            })
+            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                }
+            });
+            return builder.create();
         }
         return null;
     }
@@ -327,7 +424,13 @@ public class NetworkSetting extends PreferenceActivity
     }
 
     private void displayNetworkQueryFailed(int error) {
-        String status = getResources().getString(R.string.network_query_error);
+        String status;
+        if (error == NetworkQueryService.QUERY_EXCEPTION_OP_NOT_ALLOWED_DURING_VOICE_CALL) {
+            status = getResources().getString(R.string.network_search_not_allowed);
+        }
+        else {
+            status = getResources().getString(R.string.network_query_error);
+        }
 
         final PhoneGlobals app = PhoneGlobals.getInstance();
         app.notificationMgr.postTransientNotification(
@@ -374,7 +477,12 @@ public class NetworkSetting extends PreferenceActivity
 
         // delegate query request to the service.
         try {
-            mNetworkQueryService.startNetworkQuery(mCallback);
+	        if(mSimId == SimCardID.ID_ONE.toInt()){
+				mNetworkQueryService2.startNetworkQuery(mCallback2);
+			}else if(mSimId == SimCardID.ID_ZERO.toInt()){
+				mNetworkQueryService.startNetworkQuery(mCallback);
+			}
+            
         } catch (RemoteException e) {
         }
 
@@ -434,6 +542,18 @@ public class NetworkSetting extends PreferenceActivity
                 displayEmptyNetworkList(true);
             }
         }
+
+        /* After the available network query completed,
+              * we should unregister the Callback to avoid unexpected Callback register */
+        try {
+            if(mSimId == SimCardID.ID_ONE.toInt()){
+                mNetworkQueryService2.stopNetworkQuery(mCallback2);
+            }else if(mSimId == SimCardID.ID_ZERO.toInt()){
+                mNetworkQueryService.stopNetworkQuery(mCallback);
+            }
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -474,5 +594,71 @@ public class NetworkSetting extends PreferenceActivity
 
     private void log(String msg) {
         Log.d(LOG_TAG, "[NetworksList] " + msg);
+    }
+
+    /**
+     * BRCM SIM hot swap: Receives SIM Absent intent.
+     * When a broadcasted intent of SIM absent is received,
+     * call setup activity of the relative SIM should be finished.
+     */
+    BroadcastReceiver mIccCardAbsentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                final String iccCardState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                final SimCardID simCardId =
+                        (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                if (iccCardState.equals(IccCardConstants.INTENT_VALUE_ICC_ABSENT)
+                        && mSimId == simCardId.toInt()) {
+                    log("IccCard.MSG_SIM_STATE_ABSENT simCardId = " + simCardId);
+                    makeThisFinish();
+                }
+            }
+        }
+    };
+
+    /**
+     * BRCM SIM hot swap: Finish this activity.
+     * This is called when SIM removed.
+     */
+    private void makeThisFinish() {
+        /* we should unregister the Callback to avoid unexpected Callback register */
+        try {
+            if (mSimId == SimCardID.ID_ONE.toInt()){
+                mNetworkQueryService2.stopNetworkQuery(mCallback2);
+            } else if (mSimId == SimCardID.ID_ZERO.toInt()){
+                mNetworkQueryService.stopNetworkQuery(mCallback);
+            }
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
+
+        this.finish();
+    }
+
+    /**
+     * BRCM Search networks: Checked current phone status to
+     * 1. Block the function and show message to user during voice call.
+     * 2. Ask user that data service will be disconnect.
+     * This is called when user click "Search networks".
+     */
+    private boolean isAllowedSearchNetworks() {
+        PhoneConstants.State callState = mPhone.getState();
+        log("Current call state = " + callState);
+        if (callState == PhoneConstants.State.OFFHOOK) {
+            //show message
+            showDialog(DIALOG_NETWORK_SEARCH_WARN);
+            log("Phone is ringing, not allow network search.");
+            return false;
+        }
+        PhoneConstants.DataState dataState = mPhone.getDataConnectionState();
+        log("Current data connection state = " + dataState);
+        if (dataState == PhoneConstants.DataState.CONNECTED) {
+            //Ask user to disconnect current data connection?
+            showDialog(DIALOG_NETWORK_SEARCH_CONFIRM);
+            log("Data connected, ask user to disconnect data service and do search network?");
+            return false;
+        }
+        return true;
     }
 }

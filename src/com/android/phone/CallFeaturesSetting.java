@@ -22,9 +22,12 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.ContentResolver;
+import android.content.BroadcastReceiver;
+import android.content.ContentValues;  // SIM_NAME
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.pm.ActivityInfo;
@@ -36,6 +39,7 @@ import android.media.AudioManager;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.net.sip.SipManager;
+import android.net.Uri;  // SIM_NAME
 import android.os.AsyncResult;
 import android.os.Bundle;
 import android.os.Handler;
@@ -56,6 +60,8 @@ import android.provider.Settings.SettingNotFoundException;
 import android.telephony.PhoneNumberUtils;
 import android.text.Spannable;
 import android.text.SpannableString;
+import android.telephony.SmsManager;
+import android.telephony.TelephonyManager;  // SIM_NAME
 import android.text.TextUtils;
 import android.text.style.TypefaceSpan;
 import android.util.Log;
@@ -70,13 +76,40 @@ import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.cdma.TtyIntent;
 import com.android.phone.sip.SipSharedPreferences;
 
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.TelephonyProperties;
+import android.os.SystemProperties;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 
+// _DUAL_SIM start
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.TelephonyProperties;
+// _DUAL_SIM end
+
+// _CB start
+import android.os.SystemProperties;
+import android.preference.PreferenceManager;
+import android.telephony.SmsManager;
+// _CB end
+
+// _SIM_NAME start
+import android.content.ContentValues;
+import android.telephony.TelephonyManager;
+// _SIM_NAME end
 /**
  * Top level "Call settings" UI; see res/xml/call_feature_setting.xml
  *
@@ -99,6 +132,7 @@ public class CallFeaturesSetting extends PreferenceActivity
         implements DialogInterface.OnClickListener,
         Preference.OnPreferenceChangeListener,
         EditPhoneNumberPreference.OnDialogClosedListener,
+        EditSimNamePreference.OnSimNameEnteredListener, // _SIM_NAME
         EditPhoneNumberPreference.GetDefaultNumberListener{
     private static final String LOG_TAG = "CallFeaturesSetting";
     private static final boolean DBG = (PhoneGlobals.DBG_LEVEL >= 2);
@@ -154,6 +188,11 @@ public class CallFeaturesSetting extends PreferenceActivity
      */
     public static final String IGNORE_PROVIDER_EXTRA = "com.android.phone.ProviderToIgnore";
 
+    // add for save voice mail number in application
+    // preferences directly (because some SIM card don't have EF for it) 
+    final static String VM_PREFERENCES = "VMN_Preferences_PHONE";
+    final static String PREF_VOICE_MAIL_NUMBER = "voice_mail_number_PHONE";
+
     // string constants
     private static final String NUM_PROJECTION[] = {CommonDataKinds.Phone.NUMBER};
 
@@ -194,6 +233,18 @@ public class CallFeaturesSetting extends PreferenceActivity
     private static final String SIP_SETTINGS_CATEGORY_KEY =
             "sip_settings_category_key";
 
+    // _CB start
+    public static final String BUTTON_CB_KEY = "button_enable_disable_cell_broadcast";
+    private static final String BUTTON_CB_SETTING_KEY = "button_cell_broadcast_settings";
+    // _CB end
+
+    // _SIM_NAME start
+    private static final String BUTTON_SIM_NAME_KEY = "button_enable_disable_sim_name";
+    private static final String BUTTON_SIM_NAME_SETTING_KEY = "button_sim_name_setting";
+    private static final Uri SIM_NAMES_CONTENT_URI = Uri.parse("content://com.broadcom.simname/simnames");
+    private static final String[] PROJECTION = {"_id", "sim_imsi", "sim_name", "sim_name_enabled"};
+    // _SIM_NAME end
+
     private Intent mContactListIntent;
 
     /** Event for Async voicemail change call */
@@ -217,6 +268,8 @@ public class CallFeaturesSetting extends PreferenceActivity
     private static final int VOICEMAIL_PROVIDER_CFG_ID = 2;
 
     private Phone mPhone;
+    private int mSimId;
+    TelephonyManager telephonyManager; //  SIM_NAME
 
     private AudioManager mAudioManager;
     private SipManager mSipManager;
@@ -225,6 +278,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     private static final int VM_RESPONSE_ERROR = 500;
     private static final int FW_SET_RESPONSE_ERROR = 501;
     private static final int FW_GET_RESPONSE_ERROR = 502;
+    private static final int MSG_CB_ERASE_CHANNELS = 801;
 
 
     // dialog identifiers for voicemail
@@ -278,6 +332,13 @@ public class CallFeaturesSetting extends PreferenceActivity
     private Preference mVoicemailNotificationRingtone;
     private CheckBoxPreference mVoicemailNotificationVibrate;
     private SipSharedPreferences mSipSharedPreferences;
+    private CheckBoxPreference mButtonCB = null;  // _CB
+    private CheckBoxPreference mButtonSimName = null;  // _SIM_NAME
+    private EditSimNamePreference mButtonSimNameSetting = null;  // _SIM_NAME
+    private boolean mSkipFirstSIMAbsentMessage = true; // _SIM_HOT_SWAP
+
+    // synchronized for CB setting
+    private final Object mCbLock = new Object();
 
     private class VoiceMailProvider {
         public VoiceMailProvider(String name, Intent intent) {
@@ -463,6 +524,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     public void onPause() {
         super.onPause();
         mForeground = false;
+        unregisterReceiver(mIccCardAbsentReceiver);
     }
 
     /**
@@ -503,6 +565,65 @@ public class CallFeaturesSetting extends PreferenceActivity
             // Update HAC Value in AudioManager
             mAudioManager.setParameter(HAC_KEY, hac != 0 ? HAC_VAL_ON : HAC_VAL_OFF);
             return true;
+        } else if (preference == mButtonCB) {
+            int cb = mButtonCB.isChecked() ? 1 : 0;
+
+            SharedPreferences prefs =
+                    PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+
+            String chType = prefs.getString(CellBroadcastSettings.KEY_RECEIVE_CHANNEL_TYPE, "");
+
+            int[] channelList = getCbChannelListInfo(mSimId);
+
+            if (1==cb) {
+                if (DBG) Log.d(LOG_TAG,"onPreferenceTreeClick():Cell broadcast enabled");
+                if (mSimId == SimCardID.ID_ONE.toInt())
+                    Settings.Secure.putInt(getContentResolver(),
+                            Settings.Global.SIM2_CELL_BROADCAST_ENABLE,
+                            RILConstants.GSM_CELL_BROADCAST_SMS_ENABLED);
+                else
+                    Settings.Secure.putInt(getContentResolver(),
+                            Settings.Global.SIM1_CELL_BROADCAST_ENABLE,
+                            RILConstants.GSM_CELL_BROADCAST_SMS_ENABLED);
+
+                if (chType.equals(CellBroadcastSettings.CHANNEL_TYPE_ALL)) {
+                    Log.d(LOG_TAG, "enable all cb channels");
+                    CbSetAllChannelThread cbSetAllChannelThread= new CbSetAllChannelThread(true);
+                    cbSetAllChannelThread.start();
+                } else if (null != channelList) {
+                    Log.e(LOG_TAG, "While enabling Cell Broadcast, channelListInfo not empty");
+                    CbSetConfigThread cbSetConfigThread= new CbSetConfigThread(mSimId, true, channelList);
+                    cbSetConfigThread.start();
+                }
+            } else {
+                if (DBG) Log.d(LOG_TAG,"onPreferenceTreeClick():Cell broadcast disabled");
+
+                if (chType.equals(CellBroadcastSettings.CHANNEL_TYPE_ALL)) {
+                    Log.d(LOG_TAG, "disable all cb channels");
+                    CbSetAllChannelThread cbSetAllChannelThread= new CbSetAllChannelThread(false);
+                    cbSetAllChannelThread.start();
+                    if (mSimId == SimCardID.ID_ONE.toInt())
+                        Settings.Secure.putInt(getContentResolver(),
+                                Settings.Global.SIM2_CELL_BROADCAST_ENABLE,
+                                RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+                    else
+                        Settings.Secure.putInt(getContentResolver(),
+                                Settings.Global.SIM1_CELL_BROADCAST_ENABLE,
+                                RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+                } else if (null != channelList) {
+                    showDialog(MSG_CB_ERASE_CHANNELS);
+                } else {
+                    if (mSimId == SimCardID.ID_ONE.toInt())
+                        Settings.Secure.putInt(getContentResolver(),
+                                Settings.Global.SIM2_CELL_BROADCAST_ENABLE,
+                                RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+                    else
+                        Settings.Secure.putInt(getContentResolver(),
+                                Settings.Global.SIM1_CELL_BROADCAST_ENABLE,
+                                RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+                }
+            }
+            return true;
         } else if (preference == mVoicemailSettings) {
             if (DBG) log("onPreferenceTreeClick: Voicemail Settings Preference is clicked.");
             if (preference.getIntent() != null) {
@@ -528,7 +649,13 @@ public class CallFeaturesSetting extends PreferenceActivity
                 // This should let the preference use default behavior in the xml.
                 return false;
             }
-        }
+        } else if ((preference == mButtonSimName) && (null != mButtonSimName)) {  // _SIM_NAME start
+            int simNameEnabled = mButtonSimName.isChecked() ? 1 : 0;
+            ContentValues updateValues = new ContentValues();
+            updateValues.put("sim_name_enabled", simNameEnabled);
+            getContentResolver().update(SIM_NAMES_CONTENT_URI, updateValues, "sim_imsi='"
+                    + telephonyManager.getSubscriberId() + "'", null);
+        }  // _SIM_NAME end
         return false;
     }
 
@@ -1357,7 +1484,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     protected Dialog onCreateDialog(int id) {
         if ((id == VM_RESPONSE_ERROR) || (id == VM_NOCHANGE_ERROR) ||
             (id == FW_SET_RESPONSE_ERROR) || (id == FW_GET_RESPONSE_ERROR) ||
-                (id == VOICEMAIL_DIALOG_CONFIRM)) {
+                (id == VOICEMAIL_DIALOG_CONFIRM) || (id == MSG_CB_ERASE_CHANNELS)) {
 
             AlertDialog.Builder b = new AlertDialog.Builder(this);
 
@@ -1392,6 +1519,12 @@ public class CallFeaturesSetting extends PreferenceActivity
                     msgId = R.string.fw_get_in_vm_failed;
                     b.setPositiveButton(R.string.alert_dialog_yes, this);
                     b.setNegativeButton(R.string.alert_dialog_no, this);
+                    break;
+                case MSG_CB_ERASE_CHANNELS:
+                    titleId = R.string.cell_broadcast_title;
+                    msgId = R.string.erase_channels_warning;
+                    b.setPositiveButton(R.string.close_dialog, this);
+                    b.setNegativeButton(R.string.cancel, this);
                     break;
                 default:
                     msgId = R.string.exception_error;
@@ -1444,6 +1577,8 @@ public class CallFeaturesSetting extends PreferenceActivity
                     // We failed to get current forwarding settings and the user
                     // does not wish to continue.
                     switchToPreviousVoicemailProvider();
+                } else if (mCurrentDialogId == MSG_CB_ERASE_CHANNELS) {
+                    mButtonCB.setChecked(true);
                 }
                 break;
             case DialogInterface.BUTTON_POSITIVE:
@@ -1452,6 +1587,30 @@ public class CallFeaturesSetting extends PreferenceActivity
                     // We failed to get current forwarding settings but the user
                     // wishes to continue changing settings to the new vm provider
                     saveVoiceMailAndForwardingNumberStage2();
+                } else if (mCurrentDialogId == MSG_CB_ERASE_CHANNELS) {
+                    if (DBG) Log.d(LOG_TAG,"onClick():positive button pressed");
+
+                    // disable receive channel list
+                    if (mSimId == SimCardID.ID_ONE.toInt())
+                        Settings.Secure.putInt(getContentResolver(),Settings.Global.SIM2_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+                    else
+                        Settings.Secure.putInt(getContentResolver(),Settings.Global.SIM1_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+
+                    // send RIL command to delete all channels
+                    int[] channelList = getCbChannelListInfo(mSimId);
+                    if (null != channelList) {
+                        CbSetConfigThread cbSetConfigThread= new CbSetConfigThread(mSimId, false, channelList);
+                        cbSetConfigThread.start();
+                    }
+
+                    // delete all channel with mSimId
+                    getContentResolver().delete(CellBroadcastSettings.CB_CHANNELS_CONTENT_URI,"sim_id="+mSimId, null);
+
+                    // set language index to default
+                    CellBroadcastSettings.setCBLanguagePropertyValue(mSimId, CellBroadcastSettings.DEFAULT_LANGUAGE_INDEX);
+
+                    // send RIL command to disable receiving Cell Broadcast
+                    //mPhone.activateCellBroadcastSms(1, Message.obtain(mHandler, MESSAGE_ACTIVATE_CB_SMS));
                 } else {
                     finish();
                 }
@@ -1501,10 +1660,41 @@ public class CallFeaturesSetting extends PreferenceActivity
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
         if (DBG) log("onCreate(). Intent: " + getIntent());
-        mPhone = PhoneGlobals.getPhone();
+        String strSimId = getIntent().getDataString();
+        try {
+            mSimId = Integer.parseInt(strSimId);
+        } catch (NumberFormatException ex) {
+            mSimId = SimCardID.ID_ZERO.toInt();
+        }
+        if (DBG) log("----mPhoneId: " + strSimId);
+        if (!PhoneUtils.isDualMode) {
+            addPreferencesFromResource(R.xml.call_feature_setting);
+            mPhone = PhoneGlobals.getInstance().phone[0];
+        } else {
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                addPreferencesFromResource(R.xml.call_feature_setting2);
+                mPhone = PhoneGlobals.getInstance().phone[1];
+            } else {
+                addPreferencesFromResource(R.xml.call_feature_setting1);
+                mPhone = PhoneGlobals.getInstance().phone[0];
+            }
+        }
 
-        addPreferencesFromResource(R.xml.call_feature_setting);
+        //  SIM_NAME start
+        // init TelephonyManager for getting IMSI later
+        if(SimCardID.ID_ZERO.toInt() == mSimId) {
+            telephonyManager = (TelephonyManager)mPhone.getContext().getSystemService(
+                    Context.TELEPHONY_SERVICE1);
+        } else {
+            telephonyManager = (TelephonyManager)mPhone.getContext().getSystemService(
+                    Context.TELEPHONY_SERVICE2);
+        }
+        //  SIM_NAME end
 
+        //mPhone = PhoneFactory.getDefaultPhone();
+
+        //addPreferencesFromResource(R.xml.call_feature_setting);
+        
         mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
         // get buttons
@@ -1524,6 +1714,15 @@ public class CallFeaturesSetting extends PreferenceActivity
         mButtonHAC = (CheckBoxPreference) findPreference(BUTTON_HAC_KEY);
         mButtonTTY = (ListPreference) findPreference(BUTTON_TTY_KEY);
         mVoicemailProviders = (ListPreference) findPreference(BUTTON_VOICEMAIL_PROVIDER_KEY);
+        mButtonCB = (CheckBoxPreference) findPreference(BUTTON_CB_KEY);
+        //  SIM_NAME start
+        mButtonSimName = (CheckBoxPreference) findPreference(BUTTON_SIM_NAME_KEY);
+        mButtonSimNameSetting = (EditSimNamePreference) findPreference(BUTTON_SIM_NAME_SETTING_KEY);
+        if (null != mButtonSimNameSetting) {
+            mButtonSimNameSetting.setOnSimNameEnteredListener(this);
+        }
+        //  SIM_NAME end
+
         if (mVoicemailProviders != null) {
             mVoicemailProviders.setOnPreferenceChangeListener(this);
             mVoicemailSettings = (PreferenceScreen)findPreference(BUTTON_VOICEMAIL_SETTING_KEY);
@@ -1588,6 +1787,39 @@ public class CallFeaturesSetting extends PreferenceActivity
             }
         }
 
+        int iccCbChannelMaxCount = 0;
+        String property;
+        if(mPhone.getSimCardId() == SimCardID.ID_ONE) {
+            property = TelephonyProperties.PROPERTY_ICC_MAX_CB_CHANNELS + "_" + String.valueOf(mPhone.getSimCardId().toInt());
+        } else {
+            property = TelephonyProperties.PROPERTY_ICC_MAX_CB_CHANNELS;
+        }        
+        String propertyValue = SystemProperties.get(property, "0");
+        if (null != propertyValue) {
+            try {
+                iccCbChannelMaxCount = Integer.parseInt(propertyValue);
+            } catch (NumberFormatException e) {
+                Log.e(LOG_TAG, "onCreate(): PROPERTY_ICC_MAX_CB_CHANNELS property value = " + propertyValue);
+                iccCbChannelMaxCount = 0;
+            }
+        } else {
+            Log.e(LOG_TAG, "onCreate(): PROPERTY_ICC_MAX_CB_CHANNELS property value == null");
+        }
+
+        if (iccCbChannelMaxCount > 0) {
+            mButtonCB.setOnPreferenceChangeListener(this);
+        } else {
+            prefSet.removePreference(mButtonCB);
+            prefSet.removePreference(prefSet.findPreference(BUTTON_CB_SETTING_KEY));
+            mButtonCB = null;
+        }
+
+        //  SIM_NAME start
+        if (mButtonSimName != null) {
+            mButtonSimName.setOnPreferenceChangeListener(this);
+        }
+        //  SIM_NAME end
+
         if (!getResources().getBoolean(R.bool.world_phone)) {
             Preference options = prefSet.findPreference(BUTTON_CDMA_OPTIONS);
             if (options != null)
@@ -1605,7 +1837,8 @@ public class CallFeaturesSetting extends PreferenceActivity
                     addPreferencesFromResource(R.xml.cdma_call_privacy);
                 }
             } else if (phoneType == PhoneConstants.PHONE_TYPE_GSM) {
-                addPreferencesFromResource(R.xml.gsm_umts_call_options);
+                if (mSimId == SimCardID.ID_ONE.toInt()) addPreferencesFromResource(R.xml.gsm_umts_call_options2);
+                else addPreferencesFromResource(R.xml.gsm_umts_call_options);
             } else {
                 throw new IllegalStateException("Unexpected phone type: " + phoneType);
             }
@@ -1658,7 +1891,7 @@ public class CallFeaturesSetting extends PreferenceActivity
             // android.R.id.home will be triggered in onOptionsItemSelected()
             actionBar.setDisplayShowHomeEnabled(true);
             actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setDisplayShowTitleEnabled(true);
+            actionBar.setDisplayShowTitleEnabled(true); 
         }
     }
 
@@ -1759,6 +1992,9 @@ public class CallFeaturesSetting extends PreferenceActivity
         super.onResume();
         mForeground = true;
 
+        IntentFilter intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+        registerReceiver(mIccCardAbsentReceiver, intentFilter);
+
         if (isAirplaneModeOn()) {
             Preference sipSettings = findPreference(SIP_SETTINGS_CATEGORY_KEY);
             PreferenceScreen screen = getPreferenceScreen();
@@ -1805,6 +2041,40 @@ public class CallFeaturesSetting extends PreferenceActivity
             mVoicemailNotificationVibrate.setChecked(prefs.getBoolean(
                     BUTTON_VOICEMAIL_NOTIFICATION_VIBRATE_KEY, false));
         }
+
+        if (mButtonCB != null) {
+            int cb;
+            
+            if (mSimId == SimCardID.ID_ONE.toInt())
+                cb = Settings.Secure.getInt(getContentResolver(), Settings.Global.SIM2_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+            else
+                cb = Settings.Secure.getInt(getContentResolver(), Settings.Global.SIM1_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+            
+            mButtonCB.setChecked(cb != 0);
+        }
+
+        //  SIM_NAME start
+        if (mButtonSimName != null && mButtonSimNameSetting != null) {
+            Cursor cursor = getContentResolver().query(SIM_NAMES_CONTENT_URI, PROJECTION, "sim_imsi="
+                    + telephonyManager.getSubscriberId(), null,"_id DESC");
+
+            if (null != cursor) {
+                if (cursor.moveToFirst()) {
+                    //int rowId = cursor.getInt(0);
+                    //String simImsi = cursor.getString(1);
+                    String simName = cursor.getString(2);
+                    int simNameEnabled = cursor.getInt(3);
+
+                    mButtonSimName.setChecked(simNameEnabled != 0);
+                    mButtonSimNameSetting.setSummary(simName);
+                    mButtonSimNameSetting.setText(simName);
+                } else {  //no results
+                    mButtonSimName.setChecked(false);
+                }
+                cursor.close();
+            }
+        }
+        //  SIM_NAME end
 
         lookupRingtoneName();
     }
@@ -2089,7 +2359,8 @@ public class CallFeaturesSetting extends PreferenceActivity
         }
         if (DBG) log("Saving settings for " + key + ": " + newSettings.toString());
         Editor editor = mPerProviderSavedVMNumbers.edit();
-        editor.putString(key + VM_NUMBER_TAG, newSettings.voicemailNumber);
+        //Dual SIM
+        editor.putString(key + VM_NUMBER_TAG+"_PHONE"+mPhone.getSimCardId().toInt(),newSettings.voicemailNumber);
         String fwdKey = key + FWD_SETTINGS_TAG;
         CallForwardInfo[] s = newSettings.forwardingSettings;
         if (s != FWD_SETTINGS_DONT_TOUCH) {
@@ -2117,7 +2388,8 @@ public class CallFeaturesSetting extends PreferenceActivity
      * UI.
      */
     private VoiceMailProviderSettings loadSettingsForVoiceMailProvider(String key) {
-        final String vmNumberSetting = mPerProviderSavedVMNumbers.getString(key + VM_NUMBER_TAG,
+        //Dual SIM
+        final String vmNumberSetting = mPerProviderSavedVMNumbers.getString(key + VM_NUMBER_TAG+"_PHONE"+mPhone.getSimCardId().toInt(),
                 null);
         if (vmNumberSetting == null) {
             Log.w(LOG_TAG, "VoiceMailProvider settings for the key \"" + key + "\""
@@ -2160,8 +2432,9 @@ public class CallFeaturesSetting extends PreferenceActivity
         if (mVoicemailProviders == null) {
             return;
         }
+        //Dual SIM
         mPerProviderSavedVMNumbers.edit()
-            .putString(key + VM_NUMBER_TAG, null)
+            .putString(key + VM_NUMBER_TAG+"_PHONE"+mPhone.getSimCardId().toInt(), null)
             .putInt(key + FWD_SETTINGS_TAG + FWD_SETTINGS_LENGTH_TAG, 0)
             .commit();
     }
@@ -2175,7 +2448,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     public boolean onOptionsItemSelected(MenuItem item) {
         final int itemId = item.getItemId();
         if (itemId == android.R.id.home) {  // See ActionBar#setDisplayHomeAsUpEnabled()
-            onBackPressed();
+	    onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -2191,5 +2464,218 @@ public class CallFeaturesSetting extends PreferenceActivity
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         activity.startActivity(intent);
         activity.finish();
+    }
+
+    private class MyHandler extends Handler {
+
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+            default:
+                Log.e(LOG_TAG, "Error! Unhandled message in CallFeaturesSetting.java. Message: "
+                      + msg.what);
+                break;
+            }
+        }
+    }
+    
+    private int[] getCbChannelListInfo(int simId) {
+        Cursor cursor;
+        int channelCount;
+        
+        cursor = getContentResolver().query(CellBroadcastSettings.CB_CHANNELS_CONTENT_URI,
+                CellBroadcastSettings.PROJECTION,
+                "sim_id=" + simId + " AND channel_enabled=1",
+                null,
+                "channel_index DESC");
+        
+        if (null != cursor) {
+            channelCount = cursor.getCount();
+            int[] returnValues;
+            int arrayIndex = 0;
+            
+            returnValues = new int[channelCount];
+            
+            if ((null != returnValues) && (cursor.moveToFirst())) {
+                String channelIndex;
+                int cbChannelIndex;
+                
+                do {
+                    channelIndex = cursor.getString(2);
+                    try {
+                        cbChannelIndex = Integer.parseInt(channelIndex);
+                    } catch (NumberFormatException e) {
+                        Log.e(LOG_TAG, "Error Channel Index: " + channelIndex);
+                        cbChannelIndex = 0;
+                    }
+
+                    returnValues[arrayIndex] = cbChannelIndex;
+                    
+                    arrayIndex++;
+                } while (cursor.moveToNext());
+            }
+            cursor.close();
+            
+            if (0 < channelCount) {
+                return returnValues;
+            }
+        }
+        
+        return null;
+    }
+
+    private class CbSetConfigThread extends Thread {
+        private final int mSimId;
+        private final boolean mEnable;
+        private int[] mChannelList;
+        public CbSetConfigThread(int simId, boolean enable, int[] channelList) {
+            super("CbSetConfigThread");
+            mSimId = simId;
+            mEnable = enable;
+            if (null != channelList) {
+                mChannelList = new int[channelList.length];
+                java.lang.System.arraycopy(channelList, 0, mChannelList, 0, channelList.length);
+            } else {
+                mChannelList = null;
+            }
+        }
+
+        @Override
+        public void run() {
+            SmsManager smsManager;
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ONE);
+            } else {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ZERO);
+            }
+            if ((null != smsManager) && (null != mChannelList)) {
+                int len = mChannelList.length;
+                    synchronized (mCbLock) {
+                    for(int i = 0; i < len; i++) {
+                        if (mEnable) {
+                            smsManager.enableCellBroadcast(mChannelList[i]);
+                        } else {
+                            smsManager.disableCellBroadcast(mChannelList[i]);
+                        }
+                    }
+                }
+            } else {
+                Log.e(LOG_TAG,"CbSetConfigThread.run(): smsManager = " + smsManager +
+                        (mChannelList == null ? ", mChannelList = null" : ", mChannelList = "
+                        + Arrays.toString(mChannelList)));
+            }
+        }
+    }
+
+    private class CbSetAllChannelThread extends Thread {
+        private final boolean mEnable;
+        public CbSetAllChannelThread(boolean enable) {
+            super("CbSetAllChannelThread");
+            mEnable = enable;
+        }
+
+        @Override
+        public void run() {
+            SmsManager smsManager;
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ONE);
+            } else {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ZERO);
+            }
+            if (null != smsManager) {
+                boolean success;
+                synchronized(mCbLock) {
+                    if (mEnable) {
+                        success = smsManager.enableCellBroadcastRange(0, 999);
+                        Log.d(LOG_TAG, "CbSetConfigThread.run(): enable all channel result:"
+                            + success);
+                    } else {
+                        success = smsManager.disableCellBroadcastRange(0, 999);
+                        Log.d(LOG_TAG, "CbSetConfigThread.run(): disable all channel result:"
+                            + success);
+                    }
+                }
+            } else {
+                Log.e(LOG_TAG,"CbSetAllChannelThread.run(): smsManager = " + smsManager);
+            }
+        }
+    }
+    // _CB end
+
+    // _SIM_NAME start
+    public void onSimNameEntered(EditSimNamePreference preference, boolean positiveResult) {
+        if (preference == mButtonSimNameSetting && positiveResult && null != mButtonSimNameSetting) {
+            String simName =  mButtonSimNameSetting.getText();
+            Log.d(LOG_TAG, "mButtonSimNameSetting.getText() = " + simName);
+            if (simName.length() == 0) {
+                return;
+            }
+
+            String imsi = telephonyManager.getSubscriberId();
+            Log.d(LOG_TAG, "IMSI: " + imsi);
+            if (saveSimNameWithImsi(imsi, simName)) {
+                mButtonSimNameSetting.setSummary(simName);
+            }
+        }
+    }
+
+    private boolean saveSimNameWithImsi(String imsi, String simName) {
+        int result = 0;
+        Cursor cursor = getContentResolver().query(SIM_NAMES_CONTENT_URI, PROJECTION, "sim_imsi="
+                + telephonyManager.getSubscriberId(), null,"_id DESC");
+
+        if (null != cursor) {
+            if (cursor.moveToFirst()) { //have this record, just update
+                Log.d(LOG_TAG, "update");
+                ContentValues updateValues = new ContentValues();
+                updateValues.put("sim_name", simName);
+                updateValues.put("sim_name_enabled", mButtonSimName.isChecked() ? 1 : 0);
+                result = getContentResolver().update(SIM_NAMES_CONTENT_URI, updateValues, "sim_imsi="
+                        + imsi, null);
+            } else {  //no results
+                Log.d(LOG_TAG, "no query results, insert a new one");
+                ContentValues initialValues = new ContentValues();
+                initialValues.put("sim_imsi", imsi);
+                initialValues.put("sim_name", simName);
+                initialValues.put("sim_name_enabled", mButtonSimName.isChecked()? 1 : 0);
+                result = (getContentResolver().insert(SIM_NAMES_CONTENT_URI, initialValues) != null) ? 1 : 0;
+            }
+            cursor.close();
+        } else {
+            Log.e(LOG_TAG, "query error");
+            return false;
+        }
+
+        return (result != 0) ? true : false;
+    }
+    // SIM_NAME end
+
+    /**
+     * Receives SIM Absent intent.
+     * When a broadcasted intent of SIM absent is received,
+     * call setup activity of the relative SIM should be finished.
+     */
+    BroadcastReceiver mIccCardAbsentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                final String iccCardState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                final SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                if (iccCardState.equals(IccCardConstants.INTENT_VALUE_ICC_ABSENT)
+                        && mSimId == simCardId.toInt()) {
+                    Log.d(LOG_TAG, "IccCard.MSG_SIM_STATE_ABSENT simCardId = " + simCardId);
+                    makeThisFinish();
+                }
+            }
+        }
+    };
+
+    /**
+     * Finish this activity.
+     * This is called when SIM removed.
+     */
+    private void makeThisFinish() {
+        Log.d(LOG_TAG,"makeThisFinish");
+        this.finish();
     }
 }

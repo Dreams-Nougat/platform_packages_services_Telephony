@@ -18,7 +18,11 @@ package com.android.phone;
 
 import android.app.ActionBar;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.AsyncResult;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,6 +37,12 @@ import android.widget.Toast;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.Phone;
 
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyIntents;
+
 /**
  * FDN settings UI for the Phone app.
  * Rewritten to look and behave closer to the other preferences.
@@ -45,6 +55,7 @@ public class FdnSetting extends PreferenceActivity
 
     private Phone mPhone;
 
+    private int mSimId = SimCardID.ID_ZERO.toInt();
     /**
      * Events we handle.
      * The first is used for toggling FDN enable, the second for the PIN change.
@@ -58,8 +69,11 @@ public class FdnSetting extends PreferenceActivity
     private static final String BUTTON_FDN_ENABLE_KEY = "button_fdn_enable_key";
     private static final String BUTTON_CHANGE_PIN2_KEY = "button_change_pin2_key";
 
+	  private static final String BUTTON_FDN_LIST_KEY = "button_fdn_list_key";
+	
     private EditPinPreference mButtonEnableFDN;
     private EditPinPreference mButtonChangePin2;
+    private PreferenceScreen mButtonFDNList;
 
     // State variables
     private String mOldPin;
@@ -73,11 +87,13 @@ public class FdnSetting extends PreferenceActivity
     private static final int PIN_CHANGE_REENTER_PIN_FOR_PUK = 5;
     private int mPinChangeState;
     private boolean mIsPuk2Locked;    // Indicates we know that we are PUK2 blocked.
+    private boolean mPinLocked;
 
     private static final String SKIP_OLD_PIN_KEY = "skip_old_pin_key";
     private static final String PIN_CHANGE_STATE_KEY = "pin_change_state_key";
     private static final String OLD_PIN_KEY = "old_pin_key";
     private static final String NEW_PIN_KEY = "new_pin_key";
+    private static final String PUK_KEY = "puk_key";
     private static final String DIALOG_MESSAGE_KEY = "dialog_message_key";
     private static final String DIALOG_PIN_ENTRY_KEY = "dialog_pin_entry_key";
 
@@ -264,6 +280,7 @@ public class FdnSetting extends PreferenceActivity
                                     break;
                             }
                         }
+                        updatePinState();
                         updateEnableFDN();
                     }
                     break;
@@ -314,6 +331,7 @@ public class FdnSetting extends PreferenceActivity
                             resetPinChangeState();
                         }
                     }
+                    updatePinState();
                     break;
             }
         }
@@ -326,7 +344,6 @@ public class FdnSetting extends PreferenceActivity
     public void onCancel(DialogInterface dialog) {
         // set the state of the preference and then display the dialog.
         resetPinChangeStateForPUK2();
-        displayPinChangeDialog(0, true);
     }
 
     /**
@@ -358,30 +375,33 @@ public class FdnSetting extends PreferenceActivity
     }
 
     private final void displayPinChangeDialog(int strId, boolean shouldDisplay) {
-        int msgId;
+		int pinRemainingCount = 0;
+		String msg = "";
         switch (mPinChangeState) {
             case PIN_CHANGE_OLD:
-                msgId = R.string.oldPin2Label;
+                pinRemainingCount = getPinRemainingCount(2);
+                msg = mPhone.getContext().getString(R.string.oldPin2Label) + "(" + Integer.toString(pinRemainingCount) + ")";
                 break;
             case PIN_CHANGE_NEW:
             case PIN_CHANGE_NEW_PIN_FOR_PUK:
-                msgId = R.string.newPin2Label;
+                msg = mPhone.getContext().getString(R.string.newPin2Label);
                 break;
             case PIN_CHANGE_REENTER:
             case PIN_CHANGE_REENTER_PIN_FOR_PUK:
-                msgId = R.string.confirmPin2Label;
+                msg = mPhone.getContext().getString(R.string.confirmPin2Label);
                 break;
             case PIN_CHANGE_PUK:
             default:
-                msgId = R.string.label_puk2_code;
+                pinRemainingCount = getPinRemainingCount(3);
+                msg = mPhone.getContext().getString(R.string.label_puk2_code) + "(" + Integer.toString(pinRemainingCount) + ")";
                 break;
         }
 
         // append the note / additional message, if needed.
         if (strId != 0) {
-            mButtonChangePin2.setDialogMessage(getText(msgId) + "\n" + getText(strId));
+            mButtonChangePin2.setDialogMessage(msg + "\n" + getText(strId));
         } else {
-            mButtonChangePin2.setDialogMessage(msgId);
+            mButtonChangePin2.setDialogMessage(msg);
         }
 
         // only display if requested.
@@ -389,6 +409,10 @@ public class FdnSetting extends PreferenceActivity
             mButtonChangePin2.showPinDialog();
         }
     }
+
+	private int getPinRemainingCount(int type) {
+		return mPhone.getIccCard().getPinRemainingStatus(type);
+	}
 
     /**
      * Reset the state of the pin change dialog.
@@ -432,33 +456,71 @@ public class FdnSetting extends PreferenceActivity
         }
     }
 
+    private void updatePinState() {
+        int pinRemainingCount = getPinRemainingCount(2);
+        if (pinRemainingCount == 0) {
+            mPinLocked = true;
+            mButtonEnableFDN.setEnabled(false);
+            mButtonChangePin2.setTitle(R.string.unlock_pin2);
+            mButtonFDNList.setEnabled(false);
+            resetPinChangeStateForPUK2();
+        } else {
+            mPinLocked = false;
+            mButtonEnableFDN.setEnabled(true);
+            mButtonChangePin2.setTitle(R.string.change_pin2);
+            mButtonFDNList.setEnabled(true);
+        }
+    }
+	
     /**
      * Reflect the updated FDN state in the UI.
      */
     private void updateEnableFDN() {
+		int pinRemainingCount = getPinRemainingCount(2);
+		String msg = getText(R.string.enter_pin2_text) + "(" + Integer.toString(pinRemainingCount) + ")";
+
         if (mPhone.getIccCard().getIccFdnEnabled()) {
             mButtonEnableFDN.setTitle(R.string.enable_fdn_ok);
             mButtonEnableFDN.setSummary(R.string.fdn_enabled);
             mButtonEnableFDN.setDialogTitle(R.string.disable_fdn);
+            mButtonEnableFDN.setDialogMessage(msg);
         } else {
             mButtonEnableFDN.setTitle(R.string.disable_fdn_ok);
             mButtonEnableFDN.setSummary(R.string.fdn_disabled);
             mButtonEnableFDN.setDialogTitle(R.string.enable_fdn);
+            mButtonEnableFDN.setDialogMessage(msg);
         }
     }
 
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        String strSimId = getIntent().getDataString();
+        try {
+            mSimId = Integer.parseInt(strSimId);
+        } catch (NumberFormatException ex) {
+            mSimId = SimCardID.ID_ZERO.toInt();
+        }
 
-        addPreferencesFromResource(R.xml.fdn_setting);
+        //Log.d("FdnSetting", "-----The activePhone id is: " + mSimId);
+        if (SimCardID.ID_ONE.toInt() == mSimId) {
+            addPreferencesFromResource(R.xml.fdn_setting2);
+            mPhone = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+        } else {
+            addPreferencesFromResource(R.xml.fdn_setting);
+            mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
+        }
 
-        mPhone = PhoneGlobals.getPhone();
+        if (mPhone == null) {
+            //Log.e("FdnSetting", "------ERROR and get default phone instance -------");
+            mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
+        }
 
         //get UI object references
         PreferenceScreen prefSet = getPreferenceScreen();
         mButtonEnableFDN = (EditPinPreference) prefSet.findPreference(BUTTON_FDN_ENABLE_KEY);
         mButtonChangePin2 = (EditPinPreference) prefSet.findPreference(BUTTON_CHANGE_PIN2_KEY);
+        mButtonFDNList = (PreferenceScreen) prefSet.findPreference(BUTTON_FDN_LIST_KEY);
 
         //assign click listener and update state
         mButtonEnableFDN.setOnPinEnteredListener(this);
@@ -474,6 +536,7 @@ public class FdnSetting extends PreferenceActivity
             mPinChangeState = icicle.getInt(PIN_CHANGE_STATE_KEY);
             mOldPin = icicle.getString(OLD_PIN_KEY);
             mNewPin = icicle.getString(NEW_PIN_KEY);
+            mPuk2 = icicle.getString(PUK_KEY);
             mButtonChangePin2.setDialogMessage(icicle.getString(DIALOG_MESSAGE_KEY));
             mButtonChangePin2.setText(icicle.getString(DIALOG_PIN_ENTRY_KEY));
         }
@@ -488,8 +551,12 @@ public class FdnSetting extends PreferenceActivity
     @Override
     protected void onResume() {
         super.onResume();
-        mPhone = PhoneGlobals.getPhone();
+        //mPhone = PhoneGlobals.getPhone();
+        updatePinState();
         updateEnableFDN();
+
+        IntentFilter intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+        registerReceiver(mIccCardAbsentReceiver, intentFilter);
     }
 
     /**
@@ -502,6 +569,7 @@ public class FdnSetting extends PreferenceActivity
         out.putInt(PIN_CHANGE_STATE_KEY, mPinChangeState);
         out.putString(OLD_PIN_KEY, mOldPin);
         out.putString(NEW_PIN_KEY, mNewPin);
+        out.putString(PUK_KEY, mPuk2); //BRCM
         out.putString(DIALOG_MESSAGE_KEY, mButtonChangePin2.getDialogMessage().toString());
         out.putString(DIALOG_PIN_ENTRY_KEY, mButtonChangePin2.getText());
     }
@@ -518,6 +586,44 @@ public class FdnSetting extends PreferenceActivity
 
     private void log(String msg) {
         Log.d(LOG_TAG, "FdnSetting: " + msg);
+    }
+
+    /**
+     * Receives SIM Absent intent.
+     * When a broadcasted intent of SIM absent is received,
+     * call setup activity of the relative SIM should be finished.
+     */
+    BroadcastReceiver mIccCardAbsentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                final String iccCardState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                final SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                if (iccCardState.equals(IccCardConstants.INTENT_VALUE_ICC_ABSENT)
+                        && mPhone.getSimCardId() == simCardId) {
+                    Log.d("FdnSetting","IccCard.MSG_SIM_STATE_ABSENT simCardId = " + simCardId);
+                    makeThisFinish();
+                }
+            }
+        }
+    };
+
+    /**
+     * Finish this activity.
+     * This is called when SIM removed.
+     */
+    private void makeThisFinish() {
+        Log.d("FdnSetting","makeThisFinish");
+        mButtonEnableFDN.setEnabled(false);
+        mButtonEnableFDN.setEnabled(false);
+        this.finish();
+    }
+
+    @Override
+    protected void onPause() {
+        Log.d("FdnSetting", "onPause");
+        super.onPause();
+        unregisterReceiver(mIccCardAbsentReceiver);
     }
 }
 

@@ -35,6 +35,8 @@ import com.android.internal.telephony.TelephonyCapabilities;
 
 import android.util.Log;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+
 /*
  * Handles OTA Start procedure at phone power up. At phone power up, if phone is not OTA
  * provisioned (check MIN value of the Phone) and 'device_provisioned' is not set,
@@ -86,8 +88,12 @@ public class OtaStartupReceiver extends BroadcastReceiver {
                     // it's finally OK to start OTA provisioning
                     if (state.getState() == ServiceState.STATE_IN_SERVICE) {
                         if (DBG) Log.d(TAG, "call OtaUtils.maybeDoOtaCall after network is available");
-                        Phone phone = PhoneGlobals.getPhone();
+                        Phone phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
                         phone.unregisterForServiceStateChanged(this);
+                        if (PhoneUtils.isDualMode) {
+                            Phone phone2 = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+                            phone2.unregisterForServiceStateChanged(this);
+                        }
                         OtaUtils.maybeDoOtaCall(mContext, mHandler, MIN_READY);
                     }
                     break;
@@ -111,7 +117,7 @@ public class OtaStartupReceiver extends BroadcastReceiver {
             return;
         }
 
-        if (!TelephonyCapabilities.supportsOtasp(PhoneGlobals.getPhone())) {
+        if (!TelephonyCapabilities.supportsOtasp(PhoneGlobals.getPhone(SimCardID.ID_ZERO))) {
             if (DBG) Log.d(TAG, "OTASP not supported, nothing to do.");
             return;
         }
@@ -133,10 +139,15 @@ public class OtaStartupReceiver extends BroadcastReceiver {
 
         // Delay OTA provisioning if network is not available yet
         PhoneGlobals app = PhoneGlobals.getInstance();
-        Phone phone = PhoneGlobals.getPhone();
+        Phone phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
+        Phone phone2 = null;
         if (app.mCM.getServiceState() != ServiceState.STATE_IN_SERVICE) {
             if (DBG) Log.w(TAG, "Network is not ready. Registering to receive notification.");
             phone.registerForServiceStateChanged(mHandler, SERVICE_STATE_CHANGED, null);
+            if (PhoneUtils.isDualMode) {
+                phone2 = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+                phone2.registerForServiceStateChanged(mHandler, SERVICE_STATE_CHANGED, null);
+            }
             return;
         }
 

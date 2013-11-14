@@ -29,8 +29,37 @@
         android:summary="@string/data_enable_summary"/>
 
     <CheckBoxPreference
+        android:key="button_bpm_enabled_key"
+        android:title="@string/bpm_enabled"
+        android:persistent="false"
+        android:summary="@string/bpm_enable_summary"/>
+
+    <ListPreference
+    	android:key="default_sim_for_data_connection_key"
+    	android:title="@string/default_sim_data_connection_title"
+    	android:summary="@string/default_sim_data_connection_summary"
+    	android:entries="@array/default_sim_for_data_connection_entries"
+    	android:entryValues="@array/default_sim_for_data_connection_values"
+    	android:persistent="false"/>
+
+    <ListPreference
+        android:key="default_sim_for_3g_network_key"
+        android:title="@string/default_sim_for_3g_network_title"
+        android:summary="@string/default_sim_for_3g_network_summary"
+        android:entries="@array/default_sim_for_3g_network_entries"
+        android:entryValues="@array/default_sim_for_3g_network_values"
+        android:persistent="false"/>
+
+    <CheckBoxPreference
         android:key="button_roaming_key"
-        android:title="@string/roaming"
+        android:title="@string/roaming_sim_1"
+        android:persistent="false"
+        android:summaryOn="@string/roaming_enable"
+        android:summaryOff="@string/roaming_disable"/>
+
+   <CheckBoxPreference
+        android:key="button_roaming_2_key"
+        android:title="@string/roaming_sim_2"
         android:persistent="false"
         android:summaryOn="@string/roaming_enable"
         android:summaryOff="@string/roaming_disable"/>

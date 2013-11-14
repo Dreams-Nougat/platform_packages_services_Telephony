@@ -21,9 +21,11 @@ import static android.view.Window.PROGRESS_VISIBILITY_ON;
 
 import android.app.ListActivity;
 import android.content.AsyncQueryHandler;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -34,6 +36,13 @@ import android.widget.CursorAdapter;
 import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.IccProvider;
+import com.android.internal.telephony.TelephonyIntents;
+
 /**
  * ADN List activity for the Phone app.
  */
@@ -42,14 +51,25 @@ public class ADNList extends ListActivity {
     protected static final boolean DBG = false;
 
     private static final String[] COLUMN_NAMES = new String[] {
+        IccProvider.ICC_TAG,IccProvider.ICC_NUMBER,IccProvider.ICC_EMAILS,IccProvider.ICC_ANRS,IccProvider.ICC_INDEX
+        /*
         "name",
         "number",
-        "emails"
+        "emails",
+        //<3g pb>
+        "anrs",
+        "index"
+        //<end>
+        */
     };
 
     protected static final int NAME_COLUMN = 0;
     protected static final int NUMBER_COLUMN = 1;
     protected static final int EMAILS_COLUMN = 2;
+    //<3g pb>
+    protected static final int ANR_COLUMN = 3;
+    protected static final int INDEX_COLUMN = 4;
+    //<end>
 
     private static final int[] VIEW_NAMES = new int[] {
         android.R.id.text1,
@@ -70,6 +90,8 @@ public class ADNList extends ListActivity {
 
     protected int mInitialSelection = -1;
 
+    private SimCardID mActivePhoneId = SimCardID.ID_ZERO;
+
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
@@ -83,6 +105,9 @@ public class ADNList extends ListActivity {
     protected void onResume() {
         super.onResume();
         query();
+
+        IntentFilter intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+        registerReceiver(mIccCardAbsentReceiver, intentFilter);
     }
 
     @Override
@@ -105,6 +130,14 @@ public class ADNList extends ListActivity {
     private void query() {
         Uri uri = resolveIntent();
         if (DBG) log("query: starting an async query");
+
+        String authority = uri.getAuthority();
+        if (authority.equals("icc")) {
+            mActivePhoneId = SimCardID.ID_ZERO;
+        }else if (authority.equals("icc2")){
+            mActivePhoneId = SimCardID.ID_ONE;
+        }
+        
         mQueryHandler.startQuery(QUERY_TOKEN, null, uri, COLUMN_NAMES,
                 null, null, null);
         displayProgress(true);
@@ -163,9 +196,28 @@ public class ADNList extends ListActivity {
     private void displayProgress(boolean loading) {
         if (DBG) log("displayProgress: " + loading);
 
-        mEmptyText.setText(loading ? R.string.simContacts_emptyLoading:
-            (isAirplaneModeOn(this) ? R.string.simContacts_airplaneMode :
-                R.string.simContacts_empty));
+        //mEmptyText.setText(loading ? R.string.simContacts_emptyLoading:
+        //    (isAirplaneModeOn(this) ? R.string.simContacts_airplaneMode :
+        //        R.string.simContacts_empty));
+        if (loading){
+            mEmptyText.setText(R.string.simContacts_emptyLoading);
+        }else{
+        	if (isAirplaneModeOn(this)) {
+		    	mEmptyText.setText(R.string.simContacts_airplaneMode);
+        	} else {
+		    	Phone phone = null;
+		    	if(mActivePhoneId != null && mActivePhoneId.toInt() == SimCardID.ID_ONE.toInt())
+					phone = PhoneGlobals.getInstance().phone[1];
+		    	else
+					phone = PhoneGlobals.getInstance().phone[0];
+			
+		        if (phone != null && phone.getIccCard().getState() != IccCardConstants.State.READY){
+		            mEmptyText.setText(R.string.simContacts_no_sim);
+		        }else{
+		            mEmptyText.setText(R.string.simContacts_empty);
+		        }
+            }
+        }
         getWindow().setFeatureInt(
                 Window.FEATURE_INDETERMINATE_PROGRESS,
                 loading ? PROGRESS_VISIBILITY_ON : PROGRESS_VISIBILITY_OFF);
@@ -183,7 +235,7 @@ public class ADNList extends ListActivity {
 
         @Override
         protected void onQueryComplete(int token, Object cookie, Cursor c) {
-            if (DBG) log("onQueryComplete: cursor.count=" + c.getCount());
+            if (DBG) log("onQueryComplete: cursor.count=" + ((c==null)?"null":c.getCount()));
             mCursor = c;
             setAdapter();
             displayProgress(false);
@@ -213,5 +265,40 @@ public class ADNList extends ListActivity {
 
     protected void log(String msg) {
         Log.d(TAG, "[ADNList] " + msg);
+    }
+
+    /**
+     * Receives SIM Absent intent.
+     * When a broadcasted intent of SIM absent is received,
+     * call setup activity of the relative SIM should be finished.
+     */
+    BroadcastReceiver mIccCardAbsentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                final String iccCardState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                final SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                if (iccCardState.equals(IccCardConstants.INTENT_VALUE_ICC_ABSENT)
+                        && mActivePhoneId == simCardId) {
+                    log("IccCard.MSG_SIM_STATE_ABSENT simCardId = " + simCardId);
+                    makeThisFinish();
+                }
+            }
+        }
+    };
+
+    /**
+     * Finish this activity.
+     * This is called when SIM removed.
+     */
+    private void makeThisFinish() {
+        this.finish();
+    }
+
+    @Override
+    protected void onPause() {
+        log("onPause");
+        super.onPause();
+        unregisterReceiver(mIccCardAbsentReceiver);
     }
 }

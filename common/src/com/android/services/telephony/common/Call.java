@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+
 /**
  * Class object used across CallHandlerService APIs.
  * Describes a single call and its state.
@@ -328,6 +330,14 @@ public final class Call implements Parcelable {
 
     public void setGatewayPackage(String packageName) {
         mGatewayPackage = packageName;
+    }
+
+    public SimCardID getSimCardId() {
+        return mIdentification.getSimCardId();
+    }
+
+    public void setSimCardId(SimCardID simCardId) {
+        mIdentification.setSimCardId(simCardId);
     }
 
     /**

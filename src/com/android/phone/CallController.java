@@ -34,6 +34,10 @@ import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
 import android.util.Log;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+//import com.rv.videophone.*;//TODO: JB_DISABLE_VT
+
+
 /**
  * Phone app module in charge of "call control".
  *
@@ -134,11 +138,10 @@ public class CallController extends Handler {
             case THREEWAY_CALLERINFO_DISPLAY_DONE:
                 if (DBG) log("THREEWAY_CALLERINFO_DISPLAY_DONE...");
 
-                if (mApp.cdmaPhoneCallState.getCurrentCallState()
+		if (mApp.cdmaPhoneCallState[msg.arg1].getCurrentCallState()
                     == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE) {
                     // Reset the mThreeWayCallOrigStateDialing state
-                    mApp.cdmaPhoneCallState.setThreeWayCallOrigState(false);
-
+		    mApp.cdmaPhoneCallState[msg.arg1].setThreeWayCallOrigState(false);
                     mApp.getCallModeler().setCdmaOutgoing3WayCall(null);
                 }
                 break;
@@ -224,10 +227,26 @@ public class CallController extends Handler {
             throw new IllegalArgumentException("Unexpected action: " + action);
         }
 
+	//dual sim - start
+        SimCardID simCardId;
+        int defSimCardId = PhoneGlobals.getInstance().phoneMgr[SimCardID.ID_ZERO.toInt()].getDefaultSimForVoiceCalls();
+
+        if (intent.hasExtra("simId")) {
+            simCardId = (SimCardID) (intent.getExtra("simId", SimCardID.ID_ZERO));
+            if(DBG) log("placeCall()... intent has simId, the active phone is... " + simCardId);
+        } else {
+            if (SimCardID.ID_ONE.toInt() == defSimCardId) {
+                simCardId = SimCardID.ID_ONE;
+            } else {
+                simCardId = SimCardID.ID_ZERO;
+            }
+            if(DBG) log("placeCall()... intent has no simId, the active phone is... " + simCardId);
+        }
+
         // Check to see if this is an OTASP call (the "activation" call
         // used to provision CDMA devices), and if so, do some
         // OTASP-specific setup.
-        Phone phone = mApp.mCM.getDefaultPhone();
+        Phone phone = mApp.mCM.getDefaultPhone(simCardId);
         if (TelephonyCapabilities.supportsOtasp(phone)) {
             checkForOtaspCall(intent);
         }
@@ -242,7 +261,7 @@ public class CallController extends Handler {
         // by the PhoneUtils phone state change handler.)
         mApp.setRestoreMuteOnInCallResume(false);
 
-        CallStatusCode status = placeCallInternal(intent);
+        CallStatusCode status = placeCallInternal(intent, simCardId);
 
         switch (status) {
             // Call was placed successfully:
@@ -285,7 +304,7 @@ public class CallController extends Handler {
      *    outgoing call.  If there was some kind of failure, return one of
      *    the other CallStatusCode codes indicating what went wrong.
      */
-    private CallStatusCode placeCallInternal(Intent intent) {
+    private CallStatusCode placeCallInternal(Intent intent, SimCardID simCardId) {
         if (DBG) log("placeCallInternal()...  intent = " + intent);
 
         // TODO: This method is too long.  Break it down into more
@@ -296,10 +315,19 @@ public class CallController extends Handler {
         String number;
         Phone phone = null;
 
+	boolean vtCall = intent.getBooleanExtra(VTOutgoingCallBroadcaster.EXTRA_VTPHONE, false);
+        log("placeCallInternal()... vtCall="+vtCall);
+
         // Check the current ServiceState to make sure it's OK
         // to even try making a call.
         CallStatusCode okToCallStatus = checkIfOkToInitiateOutgoingCall(
                 mCM.getServiceState());
+
+	//if(!VTFramework.getVTFramework().IsVTEnable()&& vtCall) {//TODO: JB_DISABLE_VT
+        if (true) {
+            log("placeCallInternal()... set VT call = false ");
+            vtCall=false;
+        }
 
         // TODO: Streamline the logic here.  Currently, the code is
         // unchanged from its original form in InCallScreen.java.  But we
@@ -320,13 +348,18 @@ public class CallController extends Handler {
             // or any of combinations
             String sipPhoneUri = intent.getStringExtra(
                     OutgoingCallBroadcaster.EXTRA_SIP_PHONE_URI);
-            phone = PhoneUtils.pickPhoneBasedOnNumber(mCM, scheme, number, sipPhoneUri);
+            phone = PhoneUtils.pickPhoneBasedOnNumber(mCM, scheme, number, sipPhoneUri, simCardId);
             if (VDBG) log("- got Phone instance: " + phone + ", class = " + phone.getClass());
 
             // update okToCallStatus based on new phone
             okToCallStatus = checkIfOkToInitiateOutgoingCall(
                     phone.getServiceState().getState());
 
+	    //if ((number.equals(VTFramework.getVTFramework().getVTLoopbackStr())) && vtCall){//TODO: JB_DISABLE_VT
+            if (false) {
+                log("placeCall: VT loopback mode, change the return state to InCallInitStatus.SUCCESS");
+                okToCallStatus = CallStatusCode.SUCCESS;
+            }
         } catch (PhoneUtils.VoiceMailNumberMissingException ex) {
             // If the call status is NOT in an acceptable state, it
             // may effect the way the voicemail number is being
@@ -351,7 +384,7 @@ public class CallController extends Handler {
         // (This is just a sanity-check; this policy *should* really be
         // enforced in OutgoingCallBroadcaster.onCreate(), which is the
         // main entry point for the CALL and CALL_* intents.)
-        boolean isEmergencyNumber = PhoneNumberUtils.isLocalEmergencyNumber(number, mApp);
+        boolean isEmergencyNumber = PhoneNumberUtils.isLocalEmergencyNumber(number, mApp, simCardId);
         boolean isPotentialEmergencyNumber =
                 PhoneNumberUtils.isPotentialLocalEmergencyNumber(number, mApp);
         boolean isEmergencyIntent = Intent.ACTION_CALL_EMERGENCY.equals(intent.getAction());
@@ -398,7 +431,7 @@ public class CallController extends Handler {
                 }
 
                 // ...and kick off the "emergency call from airplane mode" sequence.
-                mEmergencyCallHelper.startEmergencyCallFromAirplaneModeSequence(number);
+                mEmergencyCallHelper.startEmergencyCallFromAirplaneModeSequence(number, simCardId.toInt());
 
                 // Finally, return CallStatusCode.SUCCESS right now so
                 // that the in-call UI will remain visible (in order to
@@ -438,13 +471,23 @@ public class CallController extends Handler {
 
         // Watch out: PhoneUtils.placeCall() returns one of the
         // CALL_STATUS_* constants, not a CallStatusCode enum value.
+
+	log("placeCallInternal()... PhoneUtils.placeCall() vtCall=" + vtCall);
+
         int callStatus = PhoneUtils.placeCall(mApp,
                                               phone,
                                               number,
                                               contactUri,
                                               (isEmergencyNumber || isEmergencyIntent),
                                               rawGatewayInfo,
-                                              mCallGatewayManager);
+                                              mCallGatewayManager,
+					      vtCall);
+
+	
+	if (vtCall && (mApp.getWiredHeadsetManager().isHeadsetPlugged()==false)) {
+            log("placeCallInternal()... vtCall turnOnSpeaker");
+            PhoneUtils.turnOnSpeaker(mApp, true, false);
+        }
 
         switch (callStatus) {
             case PhoneUtils.CALL_STATUS_DIALED:
@@ -474,7 +517,7 @@ public class CallController extends Handler {
 
                 if (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
                     // Start the timer for 3 Way CallerInfo
-                    if (mApp.cdmaPhoneCallState.getCurrentCallState()
+                    if (mApp.cdmaPhoneCallState[simCardId.toInt()].getCurrentCallState()
                             == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE) {
                         //Unmute for the second MO call
                         PhoneUtils.setMute(false);
@@ -489,11 +532,11 @@ public class CallController extends Handler {
                         // by displaying the "Dialing" state for 3 seconds.
 
                         // Set the mThreeWayCallOrigStateDialing state to true
-                        mApp.cdmaPhoneCallState.setThreeWayCallOrigState(true);
+                        mApp.cdmaPhoneCallState[simCardId.toInt()].setThreeWayCallOrigState(true);
 
                         // Schedule the "Dialing" indication to be taken down in 3 seconds:
-                        sendEmptyMessageDelayed(THREEWAY_CALLERINFO_DISPLAY_DONE,
-                                                THREEWAY_CALLERINFO_DISPLAY_TIME);
+			Message message = Message.obtain(this, THREEWAY_CALLERINFO_DISPLAY_DONE, simCardId.toInt(), 0, null);
+                        sendMessageDelayed(message, THREEWAY_CALLERINFO_DISPLAY_TIME);
                     }
                 }
 

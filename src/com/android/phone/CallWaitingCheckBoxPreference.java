@@ -14,19 +14,20 @@ import android.util.AttributeSet;
 import android.util.Log;
 
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 public class CallWaitingCheckBoxPreference extends CheckBoxPreference {
     private static final String LOG_TAG = "CallWaitingCheckBoxPreference";
     private final boolean DBG = (PhoneGlobals.DBG_LEVEL >= 2);
 
     private final MyHandler mHandler = new MyHandler();
-    private final Phone mPhone;
+    private Phone mPhone;
     private TimeConsumingPreferenceListener mTcpListener;
 
     public CallWaitingCheckBoxPreference(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
 
-        mPhone = PhoneGlobals.getPhone();
+        mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
     }
 
     public CallWaitingCheckBoxPreference(Context context, AttributeSet attrs) {
@@ -37,7 +38,10 @@ public class CallWaitingCheckBoxPreference extends CheckBoxPreference {
         this(context, null);
     }
 
-    /* package */ void init(TimeConsumingPreferenceListener listener, boolean skipReading) {
+    /* package */ void init(TimeConsumingPreferenceListener listener, boolean skipReading, int simId) {
+		if(simId == SimCardID.ID_ONE.toInt()){
+			mPhone = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+		}
         mTcpListener = listener;
 
         if (!skipReading) {

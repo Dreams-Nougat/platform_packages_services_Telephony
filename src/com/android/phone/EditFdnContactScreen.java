@@ -46,6 +46,8 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
@@ -63,6 +65,7 @@ public class EditFdnContactScreen extends Activity {
 
     private static final String INTENT_EXTRA_NAME = "name";
     private static final String INTENT_EXTRA_NUMBER = "number";
+    private static final String INTENT_SIM_ID = "sim_id";
 
     private static final int PIN2_REQUEST_CODE = 100;
 
@@ -71,6 +74,7 @@ public class EditFdnContactScreen extends Activity {
     private String mPin2;
     private boolean mAddContact;
     private QueryHandler mQueryHandler;
+    private int mSimId;
 
     private EditText mNameField;
     private EditText mNumberField;
@@ -127,6 +131,10 @@ public class EditFdnContactScreen extends Activity {
                 Bundle extras = (intent != null) ? intent.getExtras() : null;
                 if (extras != null) {
                     mPin2 = extras.getString("pin2");
+                    if (TextUtils.isEmpty(mPin2)) {
+                        if (DBG) log("pin2 is null and do nothing");
+                        break;
+                    }
                     if (mAddContact) {
                         addContact();
                     } else {
@@ -155,7 +163,9 @@ public class EditFdnContactScreen extends Activity {
                         return;
                     }
                     mNameField.setText(cursor.getString(0));
-                    mNumberField.setText(cursor.getString(1));
+                    //get rid of the separators so that the string gets parsed correctly
+                    String dialString = PhoneNumberUtils.stripSeparators(cursor.getString(1));
+                    mNumberField.setText(dialString);
                 } finally {
                     if (cursor != null) {
                         cursor.close();
@@ -214,6 +224,7 @@ public class EditFdnContactScreen extends Activity {
 
         mName =  intent.getStringExtra(INTENT_EXTRA_NAME);
         mNumber =  intent.getStringExtra(INTENT_EXTRA_NUMBER);
+        mSimId = intent.getIntExtra(INTENT_SIM_ID, SimCardID.ID_ZERO.toInt());
 
         mAddContact = TextUtils.isEmpty(mNumber);
     }
@@ -265,7 +276,15 @@ public class EditFdnContactScreen extends Activity {
     }
 
     private Uri getContentURI() {
-        return Uri.parse("content://icc/fdn");
+        String uriData = null;
+
+        if (SimCardID.ID_ONE.toInt() == mSimId) {
+            uriData = "content://icc2/fdn";
+        } else {
+            uriData = "content://icc/fdn";
+        }
+        
+        return Uri.parse(uriData);
     }
 
     /**
@@ -292,9 +311,11 @@ public class EditFdnContactScreen extends Activity {
         Uri uri = getContentURI();
 
         ContentValues bundle = new ContentValues(3);
-        bundle.put("tag", getNameFromTextField());
+        bundle.put("name", getNameFromTextField());
         bundle.put("number", number);
         bundle.put("pin2", mPin2);
+
+        if (DBG) log("addContact"+bundle.getAsString("name")+":"+bundle.getAsString("number")+":"+bundle.getAsString("pin2"));
 
         mQueryHandler = new QueryHandler(getContentResolver());
         mQueryHandler.startInsert(0, null, uri, bundle);
@@ -315,12 +336,14 @@ public class EditFdnContactScreen extends Activity {
         Uri uri = getContentURI();
 
         ContentValues bundle = new ContentValues();
-        bundle.put("tag", mName);
+        bundle.put("name", mName);
         bundle.put("number", mNumber);
-        bundle.put("newTag", name);
-        bundle.put("newNumber", number);
+        bundle.put("newname", name);
+        bundle.put("newnumber", number);
         bundle.put("pin2", mPin2);
 
+        if (DBG) log("updateContact"+bundle.getAsString("name")+":"+bundle.getAsString("number")+":"+bundle.getAsString("pin2"));
+        if (DBG) log("updateContact"+bundle.getAsString("newname")+":"+bundle.getAsString("newnumber"));
         mQueryHandler = new QueryHandler(getContentResolver());
         mQueryHandler.startUpdate(0, null, uri, bundle, null, null);
         displayProgress(true);
@@ -337,6 +360,7 @@ public class EditFdnContactScreen extends Activity {
             intent.setClass(this, DeleteFdnContactScreen.class);
             intent.putExtra(INTENT_EXTRA_NAME, mName);
             intent.putExtra(INTENT_EXTRA_NUMBER, mNumber);
+            intent.putExtra(INTENT_SIM_ID, mSimId);
             startActivity(intent);
         }
         finish();

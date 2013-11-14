@@ -10,7 +10,7 @@
 
         <intent android:action="android.intent.action.MAIN"
             android:targetPackage="com.android.phone"
-            android:targetClass="com.android.phone.GsmUmtsCallForwardOptions"/>
+            android:targetClass="com.android.phone.GsmUmtsCallForwardOptions" android:data="0"/>
     </PreferenceScreen>
 
     <PreferenceScreen
@@ -20,6 +20,6 @@
 
         <intent android:action="android.intent.action.MAIN"
             android:targetPackage="com.android.phone"
-            android:targetClass="com.android.phone.GsmUmtsAdditionalCallOptions"/>
+            android:targetClass="com.android.phone.GsmUmtsAdditionalCallOptions" android:data="0"/>
     </PreferenceScreen>
 </PreferenceScreen>

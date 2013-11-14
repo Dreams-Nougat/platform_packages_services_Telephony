@@ -24,6 +24,7 @@ import android.content.res.Resources;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * List of Network-specific settings screens.
@@ -46,11 +47,15 @@ public class GsmUmtsOptions {
     }
 
     protected void create() {
-        mPrefActivity.addPreferencesFromResource(R.xml.gsm_umts_options);
+        if (!PhoneUtils.isDualMode) {
+            mPrefActivity.addPreferencesFromResource(R.xml.gsm_umts_options);
+        } else {
+            mPrefActivity.addPreferencesFromResource(R.xml.gsm_umts_options1);
+        }
         mButtonAPNExpand = (PreferenceScreen) mPrefScreen.findPreference(BUTTON_APN_EXPAND_KEY);
         mButtonOperatorSelectionExpand =
                 (PreferenceScreen) mPrefScreen.findPreference(BUTTON_OPERATOR_SELECTION_EXPAND_KEY);
-        if (PhoneFactory.getDefaultPhone().getPhoneType() != PhoneConstants.PHONE_TYPE_GSM) {
+        if (PhoneFactory.getDefaultPhone(SimCardID.ID_ZERO).getPhoneType() != PhoneConstants.PHONE_TYPE_GSM) {
             log("Not a GSM phone");
             mButtonAPNExpand.setEnabled(false);
             mButtonOperatorSelectionExpand.setEnabled(false);
@@ -90,5 +95,10 @@ public class GsmUmtsOptions {
 
     protected void log(String s) {
         android.util.Log.d(LOG_TAG, s);
+    }
+
+    public void setOptionsEnabled(boolean enable) {
+        mButtonAPNExpand.setEnabled(enable);
+        mButtonOperatorSelectionExpand.setEnabled(enable);
     }
 }

@@ -56,6 +56,7 @@ import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
 import com.android.internal.telephony.TelephonyCapabilities;
 
 /**
@@ -92,12 +93,17 @@ public class NotificationMgr {
     static final int CALL_FORWARD_NOTIFICATION = 6;
     static final int DATA_DISCONNECTED_ROAMING_NOTIFICATION = 7;
     static final int SELECTED_OPERATOR_FAIL_NOTIFICATION = 8;
+    static final int CALL_FORWARD_NOTIFICATION_2 = 9;
+    static final int VT_CALL_FORWARD_NOTIFICATION = 10;
+    static final int VT_CALL_FORWARD_NOTIFICATION_2 = 11;
+    static final int SELECTED_OPERATOR_FAIL_NOTIFICATION_2 = 12;
 
     /** The singleton NotificationMgr instance. */
     private static NotificationMgr sInstance;
 
     private PhoneGlobals mApp;
     private Phone mPhone;
+    private Phone mPhone2;
     private CallManager mCM;
 
     private Context mContext;
@@ -114,6 +120,7 @@ public class NotificationMgr {
 
     // used to track the notification of selected network unavailable
     private boolean mSelectedUnavailableNotify = false;
+    private boolean mSelectedUnavailableNotify_2 = false;
 
     // Retry params for the getVoiceMailNumber() call; see updateMwi().
     private static final int MAX_VM_NUMBER_RETRIES = 5;
@@ -136,7 +143,12 @@ public class NotificationMgr {
                 (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
         mStatusBarManager =
                 (StatusBarManager) app.getSystemService(Context.STATUS_BAR_SERVICE);
-        mPhone = app.phone;  // TODO: better style to use mCM.getDefaultPhone() everywhere instead
+        mPhone = app.phone[SimCardID.ID_ZERO.toInt()];  // TODO: better style to use mCM.getDefaultPhone() everywhere instead
+        if (PhoneUtils.isDualMode) {
+            mPhone2 = app.phone[SimCardID.ID_ONE.toInt()];
+        } else {
+            mPhone2 = null;
+        }
         mCM = app.mCM;
         statusBarHelper = new StatusBarHelper();
     }
@@ -617,8 +629,14 @@ public class NotificationMgr {
      */
     private void updateSpeakerNotification() {
         AudioManager audioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
-        boolean showNotification =
-                (mPhone.getState() == PhoneConstants.State.OFFHOOK) && audioManager.isSpeakerphoneOn();
+        boolean showNotification;
+        if (PhoneUtils.isDualMode) {
+            showNotification =
+                    (mPhone.getState() == PhoneConstants.State.OFFHOOK|| mPhone2.getState() == PhoneConstants.State.OFFHOOK) && audioManager.isSpeakerphoneOn();
+        } else {
+            showNotification =
+                mPhone.getState() == PhoneConstants.State.OFFHOOK && audioManager.isSpeakerphoneOn();
+        }
 
         if (DBG) log(showNotification
                      ? "updateSpeakerNotification: speaker ON"
@@ -758,7 +776,7 @@ public class NotificationMgr {
                 // or missing and can *never* load successfully.)
                 if (mVmNumberRetriesRemaining-- > 0) {
                     if (DBG) log("  - Retrying in " + VM_NUMBER_RETRY_DELAY_MILLIS + " msec...");
-                    mApp.notifier.sendMwiChangedDelayed(VM_NUMBER_RETRY_DELAY_MILLIS);
+                    mApp.notifier[mPhone.getSimCardId().toInt()].sendMwiChangedDelayed(VM_NUMBER_RETRY_DELAY_MILLIS);
                     return;
                 } else {
                     Log.w(LOG_TAG, "NotificationMgr.updateMwi: getVoiceMailNumber() failed after "
@@ -827,7 +845,21 @@ public class NotificationMgr {
      * @param visible true if there are messages waiting
      */
     /* package */ void updateCfi(boolean visible) {
-        if (DBG) log("updateCfi(): " + visible);
+        updateCfi(visible, SimCardID.ID_ZERO);
+    }
+
+    /* package */ void updateCfi(boolean visible, SimCardID simId) {
+        if (DBG) log("updateCfi(): " + visible + ", sim id = " + simId.toInt());
+        int notificationIndex = CALL_FORWARD_NOTIFICATION;
+        int notificationIcon;
+        if (PhoneUtils.isDualMode)
+            notificationIcon = R.drawable.stat_sys_phone_call_forward_1;
+        else
+            notificationIcon = R.drawable.stat_sys_phone_call_forward;
+        if (SimCardID.ID_ONE == simId) {
+            notificationIndex = CALL_FORWARD_NOTIFICATION_2;
+            notificationIcon = R.drawable.stat_sys_phone_call_forward_2;
+        }
         if (visible) {
             // If Unconditional Call Forwarding (forward all calls) for VOICE
             // is enabled, just show a notification.  We'll default to expanded
@@ -847,9 +879,10 @@ public class NotificationMgr {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.setClassName("com.android.phone",
                         "com.android.phone.CallFeaturesSetting");
+                intent.setData(Uri.parse(String.valueOf(simId.toInt())));
 
                 notification = new Notification(
-                        R.drawable.stat_sys_phone_call_forward,  // icon
+			notificationIcon,  // icon
                         null, // tickerText
                         0); // The "timestamp" of this notification is meaningless;
                             // we only care about whether CFI is currently on or not.
@@ -860,7 +893,7 @@ public class NotificationMgr {
                         PendingIntent.getActivity(mContext, 0, intent, 0)); // contentIntent
             } else {
                 notification = new Notification(
-                        R.drawable.stat_sys_phone_call_forward,  // icon
+			notificationIcon,  // icon
                         null,  // tickerText
                         System.currentTimeMillis()  // when
                         );
@@ -869,10 +902,78 @@ public class NotificationMgr {
             notification.flags |= Notification.FLAG_ONGOING_EVENT;  // also implies FLAG_NO_CLEAR
 
             mNotificationManager.notify(
-                    CALL_FORWARD_NOTIFICATION,
+		    notificationIndex,
                     notification);
         } else {
-            mNotificationManager.cancel(CALL_FORWARD_NOTIFICATION);
+            mNotificationManager.cancel(notificationIndex);
+        }
+    }
+
+   /**
+     * Updates the message VT call forwarding indicator notification.
+     *
+     * @param visible true if there are messages waiting
+     */
+    /* package */ void updateVTCfi(boolean visible, SimCardID simId) {
+        if (DBG) log("updateVTCfi(): " + visible + ", simId = " + simId.toInt());
+        int notificationIndex = VT_CALL_FORWARD_NOTIFICATION;
+        int notificationIcon;
+        if (PhoneUtils.isDualMode) {
+            notificationIcon = R.drawable.stat_sys_phone_call_forward_vt_1;
+        } else {
+            notificationIcon = R.drawable.stat_sys_phone_call_forward_vt;
+        }
+        if (SimCardID.ID_ONE == simId) {
+            notificationIndex = VT_CALL_FORWARD_NOTIFICATION_2;
+            notificationIcon = R.drawable.stat_sys_phone_call_forward_vt_2;
+        }
+        if (visible) {
+            // If Unconditional VT Call Forwarding (forward all calls) for VT
+            // is enabled, just show a notification.  We'll default to expanded
+            // view for now, so the there is less confusion about the icon.  If
+            // it is deemed too weird to have CF indications as expanded views,
+            // then we'll flip the flag back.
+
+            // TODO: We may want to take a look to see if the notification can
+            // display the target to forward calls to.  This will require some
+            // effort though, since there are multiple layers of messages that
+            // will need to propagate that information.
+
+            Notification notification;
+            final boolean showExpandedNotification = true;
+            if (showExpandedNotification) {
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.setClassName("com.android.phone",
+                                    "com.android.phone.CallFeaturesSetting");
+                intent.setData(Uri.parse(String.valueOf(simId.toInt())));
+
+                notification = new Notification(
+                        notificationIcon,  // icon
+                        null, // tickerText
+                        0); // The "timestamp" of this notification is meaningless;
+                            // we only care about whether CFI is currently on or not.
+                notification.setLatestEventInfo(
+                        mContext, // context
+                        mContext.getString(R.string.labelCF), // expandedTitle
+                        mContext.getString(R.string.labelDataCFU), // expandedText
+                        PendingIntent.getActivity(mContext, 0, intent, 0)); // contentIntent
+
+            } else {
+                notification = new Notification(
+                    notificationIcon,  // icon
+                    null,  // tickerText
+                    System.currentTimeMillis()  // when
+                );
+            }
+
+            notification.flags |= Notification.FLAG_ONGOING_EVENT;  // also implies FLAG_NO_CLEAR
+
+            mNotificationManager.notify(
+                notificationIndex,
+                notification);
+        } else {
+            mNotificationManager.cancel(notificationIndex);
         }
     }
 
@@ -913,13 +1014,17 @@ public class NotificationMgr {
      * Display the network selection "no service" notification
      * @param operator is the numeric operator number
      */
-    private void showNetworkSelection(String operator) {
+    private void showNetworkSelection(String operator, SimCardID simCardId) {
         if (DBG) log("showNetworkSelection(" + operator + ")...");
 
         String titleText = mContext.getString(
                 R.string.notification_network_selection_title);
         String expandedText = mContext.getString(
                 R.string.notification_network_selection_text, operator);
+        int notificationIndex = SELECTED_OPERATOR_FAIL_NOTIFICATION;
+        if (simCardId == SimCardID.ID_ONE) {
+            notificationIndex = SELECTED_OPERATOR_FAIL_NOTIFICATION_2;
+        }
 
         Notification notification = new Notification();
         notification.icon = android.R.drawable.stat_sys_warning;
@@ -934,19 +1039,24 @@ public class NotificationMgr {
         // Use NetworkSetting to handle the selection intent
         intent.setComponent(new ComponentName("com.android.phone",
                 "com.android.phone.NetworkSetting"));
+        intent.setData(Uri.parse(String.valueOf(simCardId.toInt())));
         PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
 
         notification.setLatestEventInfo(mContext, titleText, expandedText, pi);
 
-        mNotificationManager.notify(SELECTED_OPERATOR_FAIL_NOTIFICATION, notification);
+        mNotificationManager.notify(notificationIndex, notification);
     }
 
     /**
      * Turn off the network selection "no service" notification
      */
-    private void cancelNetworkSelection() {
+    private void cancelNetworkSelection(SimCardID simCardId) {
         if (DBG) log("cancelNetworkSelection()...");
-        mNotificationManager.cancel(SELECTED_OPERATOR_FAIL_NOTIFICATION);
+        int notificationIndex = SELECTED_OPERATOR_FAIL_NOTIFICATION;
+        if (simCardId == SimCardID.ID_ONE) {
+          notificationIndex = SELECTED_OPERATOR_FAIL_NOTIFICATION_2;
+        }
+        mNotificationManager.cancel(notificationIndex);
     }
 
     /**
@@ -954,33 +1064,55 @@ public class NotificationMgr {
      *
      * @param serviceState Phone service state
      */
-    void updateNetworkSelection(int serviceState) {
-        if (TelephonyCapabilities.supportsNetworkSelection(mPhone)) {
+    void updateNetworkSelection(int serviceState, SimCardID simCardId) {
+        String networkSeletctionNameKey = PhoneBase.NETWORK_SELECTION_NAME_KEY;
+        String networkSeletctionKey = PhoneBase.NETWORK_SELECTION_KEY;
+        Phone phone = mPhone;
+        if ((PhoneUtils.isDualMode)&&(simCardId == SimCardID.ID_ONE)) {
+            phone = mPhone2;
+            networkSeletctionNameKey = PhoneBase.NETWORK_SELECTION_NAME_KEY + "_" + String.valueOf(simCardId.toInt());
+            networkSeletctionKey = PhoneBase.NETWORK_SELECTION_KEY + "_" + String.valueOf(simCardId.toInt());
+        }
+        if (TelephonyCapabilities.supportsNetworkSelection(phone)) {
             // get the shared preference of network_selection.
             // empty is auto mode, otherwise it is the operator alpha name
             // in case there is no operator name, check the operator numeric
             SharedPreferences sp =
                     PreferenceManager.getDefaultSharedPreferences(mContext);
             String networkSelection =
-                    sp.getString(PhoneBase.NETWORK_SELECTION_NAME_KEY, "");
+                    sp.getString(networkSeletctionNameKey, "");
             if (TextUtils.isEmpty(networkSelection)) {
                 networkSelection =
-                        sp.getString(PhoneBase.NETWORK_SELECTION_KEY, "");
+                        sp.getString(networkSeletctionKey, "");
             }
 
             if (DBG) log("updateNetworkSelection()..." + "state = " +
-                    serviceState + " new network " + networkSelection);
+			serviceState + " new network " + networkSelection + ", simid = " + simCardId.toInt());
 
             if (serviceState == ServiceState.STATE_OUT_OF_SERVICE
                     && !TextUtils.isEmpty(networkSelection)) {
-                if (!mSelectedUnavailableNotify) {
-                    showNetworkSelection(networkSelection);
-                    mSelectedUnavailableNotify = true;
+                if (simCardId == SimCardID.ID_ONE) {
+                    if (!mSelectedUnavailableNotify_2) {
+                        showNetworkSelection(networkSelection, simCardId);
+                        mSelectedUnavailableNotify_2 = true;
+                    }
+                } else if (simCardId == SimCardID.ID_ZERO) {
+                    if (!mSelectedUnavailableNotify) {
+                        showNetworkSelection(networkSelection, simCardId);
+                        mSelectedUnavailableNotify = true;
+                    }
                 }
             } else {
-                if (mSelectedUnavailableNotify) {
-                    cancelNetworkSelection();
-                    mSelectedUnavailableNotify = false;
+                if (simCardId == SimCardID.ID_ONE) {
+                    if (mSelectedUnavailableNotify_2) {
+                        cancelNetworkSelection(simCardId);
+                        mSelectedUnavailableNotify_2 = false;
+                    }
+                } else if (simCardId == SimCardID.ID_ZERO) {
+                    if (mSelectedUnavailableNotify) {
+                        cancelNetworkSelection(simCardId);
+                        mSelectedUnavailableNotify = false;
+                    }
                 }
             }
         }
@@ -993,6 +1125,19 @@ public class NotificationMgr {
 
         mToast = Toast.makeText(mContext, msg, Toast.LENGTH_LONG);
         mToast.show();
+    }
+
+    //called by InCallScreen when swap the dual phones
+    //NOTE: the function only used in dual mode
+    /* package */void setDualPhones(SimCardID simCardId){
+        PhoneGlobals app = PhoneGlobals.getInstance();
+        if (SimCardID.ID_ONE == simCardId){
+            mPhone = app.phone[SimCardID.ID_ONE.toInt()];
+            mPhone2 = app.phone[SimCardID.ID_ZERO.toInt()];
+        } else{
+            mPhone = app.phone[SimCardID.ID_ZERO.toInt()];
+            mPhone2 = app.phone[SimCardID.ID_ONE.toInt()];
+        }
     }
 
     private void log(String msg) {

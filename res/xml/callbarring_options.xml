@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:phone="http://schemas.android.com/apk/res/com.android.phone"
+     android:title="@string/call_barring_settings">
+
+    <!--<com.android.phone.EditPinPreference
+        android:key="button_cb_BAOC_key"
+        android:title="@string/labelCB_BAOC"
+        android:persistent="false"
+        android:summaryOn="@string/sum_cb_BAOC_enabled"
+        android:summaryOff="@string/sum_cb_BAOC_disabled"
+        android:dialogTitle="@string/labelCB_BAOC"
+        android:dialogMessage="@string/messageCB_BAOC"
+        phone:confirmMode="activation"
+        phone:serviceClass="voice"
+        android:singleLine="true"
+        android:autoText="false"/>-->
+
+    <!-- Note for all com.android.phone.EditPreference objects
+
+         The last several attributes are for use with the EditText field
+         in the dialog.  These attributes are forwarded to that field
+         when the edittext is created.  The attributes include:
+           1. android:singleLine
+           2. android:autoText
+           3. android:background -->
+
+    <!-- Voice Call Barring PreferenceCategory -->
+    <PreferenceCategory
+        android:key="button_voice_call_barring_category_key"
+        android:title="@string/VoiceCallBarring"
+        android:persistent="false">   
+        <!-- Barr All Outgoing Calls -->
+        <CheckBoxPreference
+            android:key="button_cb_BAOC_key"
+            android:title="@string/labelCB_BAOC"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr Outgoing International Calls -->
+        <CheckBoxPreference
+            android:key="button_cb_BOIC_key"
+            android:title="@string/labelCB_BOIC"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr Outgoing International Calls except to Home Country -->
+        <CheckBoxPreference
+            android:key="button_cb_BOICxH_key"
+            android:title="@string/labelCB_BOICxH"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr All Incoming Calls -->
+        <CheckBoxPreference
+            android:key="button_cb_BAIC_key"
+            android:title="@string/labelCB_BAIC"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr Incoming Calls when Roaming outside the home country -->
+        <CheckBoxPreference
+            android:key="button_cb_BICr_key"
+            android:title="@string/labelCB_BICr"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+    </PreferenceCategory>
+
+    <!-- Video Call Barring PreferenceCategory -->
+    <PreferenceCategory
+        android:key="button_vt_call_barring_category_key"
+        android:title="@string/VideoTelephonyCallBarring"
+        android:persistent="false">
+        <!-- Barr All Outgoing Calls -->
+        <CheckBoxPreference
+            android:key="button_vt_cb_BAOC_key"
+            android:title="@string/labelCB_BAOC"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr Outgoing International Calls -->
+        <CheckBoxPreference
+            android:key="button_vt_cb_BOIC_key"
+            android:title="@string/labelCB_BOIC"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr Outgoing International Calls except to Home Country -->
+        <CheckBoxPreference
+            android:key="button_vt_cb_BOICxH_key"
+            android:title="@string/labelCB_BOICxH"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr All Incoming Calls -->
+        <CheckBoxPreference
+            android:key="button_vt_cb_BAIC_key"
+            android:title="@string/labelCB_BAIC"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+        <!-- Barr Incoming Calls when Roaming outside the home country -->
+        <CheckBoxPreference
+            android:key="button_vt_cb_BICr_key"
+            android:title="@string/labelCB_BICr"
+            android:defaultValue="false"
+            android:summaryOn="@string/cb_enabled"
+            android:summaryOff="@string/cb_disabled"/>
+    </PreferenceCategory>
+
+    <!-- Call Barring Password PreferenceCategory -->
+    <PreferenceCategory
+        android:key="button_call_barring_other_category_key"
+        android:title="@string/cb_other_title"
+        android:persistent="false">
+        <!-- Rearranged to use EditPinPreference -->
+        <com.android.phone.EditPinPreference 
+            android:key="button_disable_all_cb_key" 
+            android:title="@string/labelCB_disable_all_cb"
+            android:dialogTitle="@string/labelCB_disable_all_cb"
+            android:summary="@string/cb_disable_all_cb_summary"
+            android:persistent="false"/>
+        <!-- Rearranged to use EditPinPreference -->
+        <com.android.phone.EditPinPreference 
+            android:key="button_cb_password_key" 
+            android:title="@string/labelCB_change_password"
+            android:dialogTitle="@string/cb_password_dialog_title_default"
+            android:summary="@string/cb_change_password_summary"
+            android:dialogMessage="@string/cb_password_dialog_message_default"
+            android:positiveButtonText="@string/password_enter_ok"
+            android:negativeButtonText="@string/password_enter_cancel"
+            android:persistent="false"/>
+    </PreferenceCategory>
+</PreferenceScreen>

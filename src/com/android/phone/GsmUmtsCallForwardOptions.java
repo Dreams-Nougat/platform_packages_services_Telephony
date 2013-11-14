@@ -4,7 +4,10 @@ import com.android.internal.telephony.CallForwardInfo;
 import com.android.internal.telephony.CommandsInterface;
 
 import android.app.ActionBar;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.preference.Preference;
@@ -15,6 +18,11 @@ import android.view.MenuItem;
 
 import java.util.ArrayList;
 
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyIntents;
 
 public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
     private static final String LOG_TAG = "GsmUmtsCallForwardOptions";
@@ -26,6 +34,10 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
     private static final String BUTTON_CFB_KEY   = "button_cfb_key";
     private static final String BUTTON_CFNRY_KEY = "button_cfnry_key";
     private static final String BUTTON_CFNRC_KEY = "button_cfnrc_key";
+    private static final String BUTTON_DATA_CFU_KEY = "button_data_cfu_key";
+    private static final String BUTTON_DATA_CFB_KEY   = "button_data_cfb_key";
+    private static final String BUTTON_DATA_CFNRY_KEY = "button_data_cfnry_key";
+    private static final String BUTTON_DATA_CFNRC_KEY = "button_data_cfnrc_key";
 
     private static final String KEY_TOGGLE = "toggle";
     private static final String KEY_STATUS = "status";
@@ -35,6 +47,11 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
     private CallForwardEditPreference mButtonCFB;
     private CallForwardEditPreference mButtonCFNRy;
     private CallForwardEditPreference mButtonCFNRc;
+    private CallForwardEditPreference mButtonDataCFU;
+    private CallForwardEditPreference mButtonDataCFB;
+    private CallForwardEditPreference mButtonDataCFNRy;
+    private CallForwardEditPreference mButtonDataCFNRc;    
+    
 
     private final ArrayList<CallForwardEditPreference> mPreferences =
             new ArrayList<CallForwardEditPreference> ();
@@ -42,10 +59,18 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
 
     private boolean mFirstResume;
     private Bundle mIcicle;
+    private int mSimId = SimCardID.ID_ZERO.toInt();
 
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        String strSimId = getIntent().getDataString();
+        try {
+            mSimId = Integer.parseInt(strSimId);
+        } catch (NumberFormatException ex) {
+            mSimId = SimCardID.ID_ZERO.toInt();
+        }
+        if (DBG) Log.d(LOG_TAG, "----mPhoneId: " + strSimId);
 
         addPreferencesFromResource(R.xml.callforward_options);
 
@@ -54,16 +79,28 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
         mButtonCFB   = (CallForwardEditPreference) prefSet.findPreference(BUTTON_CFB_KEY);
         mButtonCFNRy = (CallForwardEditPreference) prefSet.findPreference(BUTTON_CFNRY_KEY);
         mButtonCFNRc = (CallForwardEditPreference) prefSet.findPreference(BUTTON_CFNRC_KEY);
-
+        mButtonDataCFU = (CallForwardEditPreference) prefSet.findPreference(BUTTON_DATA_CFU_KEY);
+        mButtonDataCFB   = (CallForwardEditPreference) prefSet.findPreference(BUTTON_DATA_CFB_KEY);
+        mButtonDataCFNRy = (CallForwardEditPreference) prefSet.findPreference(BUTTON_DATA_CFNRY_KEY);
+        mButtonDataCFNRc = (CallForwardEditPreference) prefSet.findPreference(BUTTON_DATA_CFNRC_KEY);
+        
         mButtonCFU.setParentActivity(this, mButtonCFU.reason);
         mButtonCFB.setParentActivity(this, mButtonCFB.reason);
         mButtonCFNRy.setParentActivity(this, mButtonCFNRy.reason);
         mButtonCFNRc.setParentActivity(this, mButtonCFNRc.reason);
+        mButtonDataCFU.setParentActivity(this, mButtonDataCFU.reason);
+        mButtonDataCFB.setParentActivity(this, mButtonDataCFB.reason);
+        mButtonDataCFNRy.setParentActivity(this, mButtonDataCFNRy.reason);
+        mButtonDataCFNRc.setParentActivity(this, mButtonDataCFNRc.reason);
 
         mPreferences.add(mButtonCFU);
         mPreferences.add(mButtonCFB);
         mPreferences.add(mButtonCFNRy);
         mPreferences.add(mButtonCFNRc);
+        mPreferences.add(mButtonDataCFU);
+        mPreferences.add(mButtonDataCFB);
+        mPreferences.add(mButtonDataCFNRy);
+        mPreferences.add(mButtonDataCFNRc);        
 
         // we wait to do the initialization until onResume so that the
         // TimeConsumingPreferenceActivity dialog can display as it
@@ -86,7 +123,7 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
         if (mFirstResume) {
             if (mIcicle == null) {
                 if (DBG) Log.d(LOG_TAG, "start to init ");
-                mPreferences.get(mInitIndex).init(this, false);
+                mPreferences.get(mInitIndex).init(this, false, mSimId);
             } else {
                 mInitIndex = mPreferences.size();
 
@@ -97,12 +134,15 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
                     cf.number = bundle.getString(KEY_NUMBER);
                     cf.status = bundle.getInt(KEY_STATUS);
                     pref.handleCallForwardResult(cf);
-                    pref.init(this, true);
+                    pref.init(this, true, mSimId);
                 }
             }
             mFirstResume = false;
             mIcicle=null;
         }
+
+        IntentFilter intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+        registerReceiver(mIccCardAbsentReceiver, intentFilter);
     }
 
     @Override
@@ -124,7 +164,7 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
     public void onFinished(Preference preference, boolean reading) {
         if (mInitIndex < mPreferences.size()-1 && !isFinishing()) {
             mInitIndex++;
-            mPreferences.get(mInitIndex).init(this, false);
+            mPreferences.get(mInitIndex).init(this, false, mSimId);
         }
 
         super.onFinished(preference, reading);
@@ -149,15 +189,19 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
             switch (requestCode) {
                 case CommandsInterface.CF_REASON_UNCONDITIONAL:
                     mButtonCFU.onPickActivityResult(cursor.getString(0));
+                mButtonDataCFU.onPickActivityResult(cursor.getString(0));
                     break;
                 case CommandsInterface.CF_REASON_BUSY:
                     mButtonCFB.onPickActivityResult(cursor.getString(0));
+                mButtonDataCFB.onPickActivityResult(cursor.getString(0));                
                     break;
                 case CommandsInterface.CF_REASON_NO_REPLY:
                     mButtonCFNRy.onPickActivityResult(cursor.getString(0));
+                mButtonDataCFNRy.onPickActivityResult(cursor.getString(0));                
                     break;
                 case CommandsInterface.CF_REASON_NOT_REACHABLE:
                     mButtonCFNRc.onPickActivityResult(cursor.getString(0));
+                mButtonDataCFNRc.onPickActivityResult(cursor.getString(0));                
                     break;
                 default:
                     // TODO: may need exception here.
@@ -177,5 +221,40 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * Receives SIM Absent intent.
+     * When a broadcasted intent of SIM absent is received,
+     * call setup activity of the relative SIM should be finished.
+     */
+    BroadcastReceiver mIccCardAbsentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                final String iccCardState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                final SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                if (iccCardState.equals(IccCardConstants.INTENT_VALUE_ICC_ABSENT)
+                        && mSimId == simCardId.toInt()) {
+                    Log.d(LOG_TAG, "IccCard.MSG_SIM_STATE_ABSENT simCardId = " + simCardId);
+                    makeThisFinish();
+                }
+            }
+        }
+    };
+
+    /**
+     * Finish this activity.
+     * This is called when SIM removed.
+     */
+    private void makeThisFinish() {
+        this.finish();
+    }
+
+    @Override
+    public void onPause() {
+        Log.d(LOG_TAG, "onPause");
+        super.onPause();
+        unregisterReceiver(mIccCardAbsentReceiver);
     }
 }

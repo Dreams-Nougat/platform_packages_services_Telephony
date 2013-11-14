@@ -35,6 +35,9 @@ import android.provider.Settings;
 import android.util.Log;
 
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
+
+
 /**
  * Ringer manager for the Phone app.
  */
@@ -55,6 +58,10 @@ public class Ringer {
     // Uri for the ringtone.
     Uri mCustomRingtoneUri = Settings.System.DEFAULT_RINGTONE_URI;
 
+    // Uri for the ringtone for SIM2 in dual mode
+    Uri mCustomRingtoneUri2;
+    private SimCardID mActiveSimCardId = SimCardID.ID_ZERO;
+ 
     private final BluetoothManager mBluetoothManager;
     Ringtone mRingtone;
     Vibrator mVibrator;
@@ -304,6 +311,29 @@ public class Ringer {
         }
     }
 
+  /**
+     * Sets the ringtone uri in preparation for ringtone creation
+     * in makeLooper().  This uri is defaulted to the phone-wide
+     * default ringtone.
+     */
+    void setCustomRingtoneUri (Uri uri, SimCardID simCardId) {
+        if (uri != null) {
+            if (SimCardID.ID_ONE == simCardId){
+                mCustomRingtoneUri2 = uri;
+            }else{
+                mCustomRingtoneUri = uri;
+            }
+        }
+    }
+
+ /**
+     * Sets current active phone name in dual mode
+     */
+    void setActivePhone(SimCardID simCardId) {
+        if (DBG) log("-----Ringer: phone id: " + simCardId);
+        mActiveSimCardId = simCardId;
+    }
+
     private void makeLooper() {
         if (mRingThread == null) {
             mRingThread = new Worker("ringer");
@@ -315,9 +345,15 @@ public class Ringer {
                         case PLAY_RING_ONCE:
                             if (DBG) log("mRingHandler: PLAY_RING_ONCE...");
                             if (mRingtone == null && !hasMessages(STOP_RING)) {
-                                // create the ringtone with the uri
-                                if (DBG) log("creating ringtone: " + mCustomRingtoneUri);
-                                r = RingtoneManager.getRingtone(mContext, mCustomRingtoneUri);
+                                if (SimCardID.ID_ONE == mActiveSimCardId){
+                                    // create the ringtone with the uri
+                                    if (DBG) log("creating ringtone 2: " + mCustomRingtoneUri2);
+                                    r = RingtoneManager.getRingtone(mContext, mCustomRingtoneUri2);
+                                } else {
+                                    // create the ringtone with the uri
+                                    if (DBG) log("creating ringtone: " + mCustomRingtoneUri);
+                                    r = RingtoneManager.getRingtone(mContext, mCustomRingtoneUri);
+                                }
                                 synchronized (Ringer.this) {
                                     if (!hasMessages(STOP_RING)) {
                                         mRingtone = r;

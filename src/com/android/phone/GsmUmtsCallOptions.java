@@ -24,6 +24,7 @@ import android.preference.PreferenceScreen;
 
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 public class GsmUmtsCallOptions extends PreferenceActivity {
     private static final String LOG_TAG = "GsmUmtsCallOptions";
@@ -35,7 +36,7 @@ public class GsmUmtsCallOptions extends PreferenceActivity {
 
         addPreferencesFromResource(R.xml.gsm_umts_call_options);
 
-        if (PhoneGlobals.getPhone().getPhoneType() != PhoneConstants.PHONE_TYPE_GSM) {
+        if (PhoneGlobals.getPhone(SimCardID.ID_ZERO).getPhoneType() != PhoneConstants.PHONE_TYPE_GSM) {
             //disable the entire screen
             getPreferenceScreen().setEnabled(false);
         }

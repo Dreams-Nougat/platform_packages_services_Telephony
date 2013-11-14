@@ -48,6 +48,7 @@ import android.view.WindowManager;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.TextView;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import java.util.List;
 
@@ -164,7 +165,10 @@ public class SipCallOptionHandler extends Activity implements
         Uri uri = mIntent.getData();
         String scheme = uri.getScheme();
         mNumber = PhoneNumberUtils.getNumberFromIntent(mIntent, this);
-        boolean isInCellNetwork = PhoneGlobals.getInstance().phoneMgr.isRadioOn();
+        boolean isInCellNetwork = PhoneGlobals.getInstance().phoneMgr[SimCardID.ID_ZERO.toInt()].isRadioOn();
+        if (PhoneUtils.isDualMode) {
+            isInCellNetwork |= PhoneGlobals.getInstance().phoneMgr[SimCardID.ID_ONE.toInt()].isRadioOn();
+        }
         boolean isKnownCallScheme = Constants.SCHEME_TEL.equals(scheme)
                 || Constants.SCHEME_SIP.equals(scheme);
         boolean isRegularCall = Constants.SCHEME_TEL.equals(scheme)

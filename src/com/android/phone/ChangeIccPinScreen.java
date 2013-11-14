@@ -36,7 +36,9 @@ import android.widget.Toast;
 
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * "Change ICC PIN" UI for the Phone app.
@@ -91,7 +93,20 @@ public class ChangeIccPinScreen extends Activity {
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
 
-        mPhone = PhoneGlobals.getPhone();
+        String strSimId = getIntent().getDataString();
+        int simId;
+        try {
+            simId = Integer.parseInt(strSimId);
+        } catch (NumberFormatException ex) {
+            simId = SimCardID.ID_ZERO.toInt();
+        }
+        if (DBG) log("----mPhoneId: " + strSimId);
+        if (SimCardID.ID_ONE.toInt() == simId) {
+            mPhone = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+        } else {
+            mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
+        }
+        //mPhone = PhoneGlobals.getPhone();
 
         resolveIntent();
 

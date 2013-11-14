@@ -548,7 +548,13 @@ public class CallModeler extends Handler {
             boolean isForConference) {
         boolean changed = false;
 
+        Log.i(TAG, "updateCallFromConnection()");
+
         final int newState = translateStateFromTelephony(connection, isForConference);
+
+        //add sim id here. We probably should add sim id all the way up at connection
+        //will leave it for later on refactory.
+        call.setSimCardId(connection.getCall().getPhone().getSimCardId());
 
         if (call.getState() != newState) {
             setNewState(call, newState, connection);
@@ -740,6 +746,7 @@ public class CallModeler extends Handler {
     private int translateStateFromTelephony(Connection connection, boolean isForConference) {
 
         com.android.internal.telephony.Call.State connState = connection.getState();
+	final Phone phone = connection.getCall().getPhone();
 
         // For the "fake" outgoing CDMA call, we need to always treat it as an outgoing call.
         if (mCdmaOutgoingConnection == connection) {
@@ -756,7 +763,7 @@ public class CallModeler extends Handler {
                 break;
             case DIALING:
             case ALERTING:
-                if (PhoneGlobals.getInstance().notifier.getIsCdmaRedialCall()) {
+                if (PhoneGlobals.getInstance().notifier[phone.getSimCardId().toInt()].getIsCdmaRedialCall()) {
                     retval = State.REDIALING;
                 } else {
                     retval = State.DIALING;

@@ -13,6 +13,7 @@ import android.os.Parcelable;
 import android.preference.ListPreference;
 import android.util.AttributeSet;
 import android.util.Log;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * {@link ListPreference} for CLIR (Calling Line Identification Restriction).
@@ -23,7 +24,7 @@ public class CLIRListPreference extends ListPreference {
     private final boolean DBG = (PhoneGlobals.DBG_LEVEL >= 2);
 
     private final MyHandler mHandler = new MyHandler();
-    private final Phone mPhone;
+    private Phone mPhone;
     private TimeConsumingPreferenceListener mTcpListener;
 
     int clirArray[];
@@ -31,7 +32,7 @@ public class CLIRListPreference extends ListPreference {
     public CLIRListPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        mPhone = PhoneGlobals.getPhone();
+        mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
     }
 
     public CLIRListPreference(Context context) {
@@ -49,7 +50,10 @@ public class CLIRListPreference extends ListPreference {
         }
     }
 
-    /* package */ void init(TimeConsumingPreferenceListener listener, boolean skipReading) {
+    /* package */ void init(TimeConsumingPreferenceListener listener, boolean skipReading, int simId) {
+		if(simId == SimCardID.ID_ONE.toInt()){
+			mPhone = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+		}
         mTcpListener = listener;
         if (!skipReading) {
             mPhone.getOutgoingCallerIdDisplay(mHandler.obtainMessage(MyHandler.MESSAGE_GET_CLIR,

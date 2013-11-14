@@ -25,10 +25,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.database.Cursor;  // BRCM SIM_NAME
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.telephony.PhoneNumberUtils;
 import android.text.Editable;
@@ -42,9 +44,18 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.EditText;
+import android.widget.TextView;  // BRCM SIM_NAME
+import android.telephony.TelephonyManager;
 
 import com.android.phone.common.HapticFeedback;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+import android.widget.LinearLayout;
+import android.widget.Button;
+import android.view.View;
+import android.view.LayoutInflater;
+import android.app.AlertDialog;
+import android.app.Dialog;
 
 /**
  * EmergencyDialer is a special dialer that is used ONLY for dialing emergency calls.
@@ -112,6 +123,14 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
     // Haptic feedback (vibration) for dialer key presses.
     private HapticFeedback mHaptic = new HapticFeedback();
 
+    //BCM215x SIM VM status flag
+    private static final int BCM_SIM_VM_NONE = 0;
+    private static final int BCM_SIM_VM_1 = 1;
+    private static final int BCM_SIM_VM_2 = 2;
+    private static final int BCM_SIM_VM_BOTH = 3;
+
+    private static final String BCM_VM1PWR_SAVING_PATH = "gsm.vm1pwrsaving";
+    private static final String BCM_VM2PWR_SAVING_PATH = "gsm.vm2pwrsaving";
     // close activity when screen turns off
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -123,6 +142,9 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
     };
 
     private String mLastNumber; // last number we tried to dial. Used to restore error dialog.
+
+	//Added for dual sim
+	private static Dialog sSimChooserDialog;
 
     @Override
     public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -310,7 +332,11 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
                     finish();
                 } else {
                     // otherwise, we place the call.
-                    placeCall();
+                	if (PhoneUtils.isDualMode) {
+                        handleDial();
+                	} else {
+                        placeCall();
+                	}
                 }
                 return true;
             }
@@ -332,7 +358,11 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
                 // Activity is forced into landscape mode due to a desk dock.
                 if (keyCode == KeyEvent.KEYCODE_ENTER
                         && event.getAction() == KeyEvent.ACTION_UP) {
-                    placeCall();
+                	if (PhoneUtils.isDualMode) {
+                        handleDial();
+                	} else {
+                        placeCall();
+                    }
                     return true;
                 }
                 break;
@@ -409,7 +439,11 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
             }
             case R.id.dialButton: {
                 mHaptic.vibrate();  // Vibrate here too, just like we do for the regular keys
-                placeCall();
+                if (PhoneUtils.isDualMode) {
+                    handleDial();
+            	} else {
+                    placeCall();
+            	}
                 return;
             }
             case R.id.digits: {
@@ -528,6 +562,166 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
         }
     }
 
+    private boolean isRegisterdToNetwork(SimCardID simId) {
+        return (0 < TelephonyManager.getDefault(simId).getNetworkOperator().length());
+    }
+
+    private int getCurrentVMStatus() {
+        final int vmOneStatus = SystemProperties.getInt(BCM_VM1PWR_SAVING_PATH, 0);
+        final int vmTwoStatus = SystemProperties.getInt(BCM_VM2PWR_SAVING_PATH, 0);
+        final int settingSIMOneStatus = Settings.System.getInt(getContentResolver(), Settings.Global.PHONE1_ON, 0);
+        final int settingSIMTwoStatus = Settings.System.getInt(getContentResolver(), Settings.Global.PHONE2_ON, 0);
+        int rs = BCM_SIM_VM_NONE;
+
+        if ((1 == settingSIMOneStatus) && (1 == settingSIMTwoStatus)) {
+            if ((0 == vmOneStatus) && (0 == vmTwoStatus)) {
+                rs = BCM_SIM_VM_BOTH;
+            } else if (0 == vmOneStatus) {
+                rs = BCM_SIM_VM_1;
+            } else if (0 == vmTwoStatus) {
+                rs = BCM_SIM_VM_2;
+            }
+        } else if (1 == settingSIMTwoStatus) {
+            rs = BCM_SIM_VM_2;
+        } else  rs = BCM_SIM_VM_1;
+
+        return rs;
+    }
+
+    private void handleDial() {
+        SimCardID simCardId = SimCardID.ID_ZERO;
+        boolean popUserMenu = false;
+        final boolean isRegistedToNetworkSim1 = isRegisterdToNetwork(SimCardID.ID_ZERO);
+        final boolean isRegistedToNetworkSim2 = isRegisterdToNetwork(SimCardID.ID_ONE);
+
+        switch (getCurrentVMStatus()) {
+        case BCM_SIM_VM_BOTH:
+            if (isRegistedToNetworkSim1 && isRegistedToNetworkSim2) {
+                popUserMenu = true;
+            } else if (isRegistedToNetworkSim1) {
+                simCardId = SimCardID.ID_ZERO;
+            } else if (isRegistedToNetworkSim2) {
+                simCardId = SimCardID.ID_ONE;
+            } else popUserMenu = true;
+            break;
+        case BCM_SIM_VM_1:
+            simCardId = SimCardID.ID_ZERO;
+            break;
+        case BCM_SIM_VM_2:
+            simCardId = SimCardID.ID_ONE;
+            break;
+        case BCM_SIM_VM_NONE:
+        default:
+            popUserMenu = true;
+            break;
+        }
+
+        if(!popUserMenu) {
+            placeCall(simCardId);
+        } else {
+            LinearLayout chooser = (LinearLayout) LayoutInflater.from(this).inflate(
+                R.layout.sim_chooser_dialog_view, null);
+            Button sim1 = (Button)chooser.findViewById(R.id.sim_chooser_card_1);
+            Button sim2 = (Button)chooser.findViewById(R.id.sim_chooser_card_2);
+            sim1.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    placeCall(SimCardID.ID_ZERO);
+                    sSimChooserDialog.dismiss();
+                }
+            });
+            sim2.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    placeCall(SimCardID.ID_ONE);
+                    sSimChooserDialog.dismiss();
+                }
+            });
+
+            // BRCM SIM_NAME start
+            TextView simName1 = (TextView) chooser.findViewById(R.id.sim1Name);
+            TextView simName2 = (TextView) chooser.findViewById(R.id.sim2Name);
+
+            TelephonyManager tm1 = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE1);
+            TelephonyManager tm2 = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE2);
+
+            String simSelectName1 = getEnabledSimSelectName(tm1.getSubscriberId());
+
+            if (simSelectName1.length() == 0) {  // no customized name, use operator name
+                simSelectName1 = tm1.getNetworkOperatorName();
+            }
+
+            if (simSelectName1.length() == 0) {
+                simSelectName1 = "SIM 1";  // neither customized name nor operator name found
+            }
+
+            simName1.setText(simSelectName1+ "\n" + tm1.getLine1Number());
+
+            String simSelectName2 = getEnabledSimSelectName(tm2.getSubscriberId());
+
+            if (simSelectName2.length() == 0) {  // no customized name, use operator name
+                simSelectName2 = tm2.getNetworkOperatorName();
+            }
+
+            if (simSelectName2.length() == 0) {
+                simSelectName2 = "SIM 2";  // neither customized name nor operator name found
+            }
+
+            simName2.setText(simSelectName2+ "\n" + tm2.getLine1Number());
+
+            simName1.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    placeCall(SimCardID.ID_ZERO);
+                    sSimChooserDialog.dismiss();
+                }
+            });
+            simName2.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    placeCall(SimCardID.ID_ONE);
+                    sSimChooserDialog.dismiss();
+                }
+            });
+            // BRCM SIM_NAME end
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setView(chooser);
+            builder.setTitle(R.string.select_sim);
+
+            //Aways create a new instance, since it may be stale (activity not the same)by now.
+            sSimChooserDialog = builder.create();
+	
+            sSimChooserDialog.show();
+        }
+    }
+	
+	/**
+	* place the call, but check to make sure it is a viable number.
+	* Added for dual sim.
+	*/
+   void placeCall(SimCardID simId) {
+	   mLastNumber = mDigits.getText().toString();
+        if (PhoneNumberUtils.isLocalEmergencyNumber(mLastNumber, this, simId)) {
+		   if (DBG) Log.d(LOG_TAG, "placing call to " + mLastNumber);
+
+		   // place the call if it is a valid number
+		   if (mLastNumber == null || !TextUtils.isGraphic(mLastNumber)) {
+			   // There is no number entered.
+			   playTone(ToneGenerator.TONE_PROP_NACK);
+			   return;
+		   }
+		   Intent intent = new Intent(Intent.ACTION_CALL_EMERGENCY);
+		   intent.setData(Uri.fromParts(Constants.SCHEME_TEL, mLastNumber, null));
+		   intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		   intent.putExtra("simId", simId);
+		   startActivity(intent);
+		   finish();
+	   } else {
+		   if (DBG) Log.d(LOG_TAG, "rejecting bad requested number " + mLastNumber);
+
+		   // erase the number and throw up an alert dialog.
+		   mDigits.getText().delete(0, mDigits.getText().length());
+		   showDialog(BAD_EMERGENCY_NUMBER_DIALOG);
+	   }
+   }
+
     /**
      * place the call, but check to make sure it is a viable number.
      */
@@ -637,4 +831,23 @@ public class EmergencyDialer extends Activity implements View.OnClickListener,
         mDialButton.setEnabled(notEmpty);
         mDelete.setEnabled(notEmpty);
     }
+
+    // BRCM SIM_NAME start
+    private String getEnabledSimSelectName(String imsi) {
+        String simSelectName = "";
+        Uri SIM_NAMES_CONTENT_URI = Uri.parse("content://com.broadcom.simname/simnames");
+        String[] PROJECTION = {"_id", "sim_imsi", "sim_name", "sim_name_enabled"};
+
+        Cursor cursor = getContentResolver().query(SIM_NAMES_CONTENT_URI, PROJECTION, "sim_imsi="
+            + imsi + " AND sim_name_enabled=1", null,"_id DESC");
+
+        if (null != cursor) {
+            if (cursor.moveToFirst()) {
+                simSelectName = cursor.getString(2);
+            }
+            cursor.close();
+        }
+        return simSelectName;
+    }
+    // BRCM SIM_NAME end
 }

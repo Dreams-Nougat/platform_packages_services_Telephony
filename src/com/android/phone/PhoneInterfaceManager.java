@@ -24,6 +24,7 @@ import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.AsyncResult;
+import android.os.Process;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -32,6 +33,8 @@ import android.os.Message;
 import android.os.Process;
 import android.os.ServiceManager;
 import android.os.UserHandle;
+import android.os.SystemProperties;
+import android.provider.Settings;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.CellInfo;
 import android.telephony.ServiceState;
@@ -45,9 +48,24 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.CallManager;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.uicc.IccIoResult;
+import static com.android.internal.telephony.TelephonyProperties.*;
+import android.net.ConnectivityManager;
+import android.os.AsyncResult;
+import android.content.Context;
+import android.os.RemoteException;
+
+import com.android.internal.telephony.gsm.GSMPhone;
+import com.android.internal.telephony.uicc.IccIoResult;
+import com.android.internal.telephony.IccUtils;
+import com.android.internal.telephony.CommandException;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /**
  * Implementation of the ITelephony interface.
@@ -64,16 +82,54 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     private static final int CMD_ANSWER_RINGING_CALL = 4;
     private static final int CMD_END_CALL = 5;  // not used yet
     private static final int CMD_SILENCE_RINGER = 6;
+    private static final int EVENT_EXCHANGE_APDU_DONE = 12;
+    private static final int EVENT_OPEN_CHANNEL_DONE = 14;
+    private static final int EVENT_CLOSE_CHANNEL_DONE = 16;
 
     /** The singleton instance. */
-    private static PhoneInterfaceManager sInstance;
+    private static PhoneInterfaceManager sInstance[] = {null,null};
 
+    private int lastError;
+
+    /**
+     * Intent for notifying the other SIM to cancel power on timers.
+     * This string name need to sync with GsmServiceStateTracker.java
+     */
+    static final String INTENT_ACTION_CANCEL_POWER_ON_TIMER = "android.intent.action.CANCEL_POWER_ON_TIMER";
     PhoneGlobals mApp;
     Phone mPhone;
     CallManager mCM;
     AppOpsManager mAppOps;
     MainThreadHandler mMainThreadHandler;
     CallHandlerServiceProxy mCallHandlerService;
+
+    private final static int MSG_TO_RIL_SWITCH_DATA_NETWORK_SIM_1 = 7;
+    private final static int MSG_TO_RIL_SWITCH_DATA_NETWORK_SIM_2 = 8;
+    private final static int MSG_TO_RIL_SWITCH_SPECIFIC_DATA_NETWORK_SIM_1 = 9;
+    private final static int MSG_TO_RIL_SWITCH_SPECIFIC_DATA_NETWORK_SIM_2 = 10;
+    private int mSpeNetworkType = 0;
+
+    // See hardware-->bcm_uril-->bcm_urill.c, signature 4, msg type 2, preferred sim id 1 byte
+    private final static byte[] RAW_HOOK_OEM_CMD_SIM_1 = {'B','R','C','M',0,'0'}; //hardcoded, RILConstants.BRIL_HOOK_SET_PREFDATA
+    private final static byte[] RAW_HOOK_OEM_CMD_SIM_2 = {'B','R','C','M',0,'1'};
+    private ConnectivityManager mConnectivityManager;
+
+    private static final class IccAPDUArgument {
+
+        public int channel, cla, command, p1, p2, p3;
+        public String data;
+
+        public IccAPDUArgument(int cla, int command, int channel,
+                int p1, int p2, int p3, String data) {
+            this.channel = channel;
+            this.cla = cla;
+            this.command = command;
+            this.p1 = p1;
+            this.p2 = p2;
+            this.p3 = p3;
+            this.data = data;
+        }
+    }
 
     /**
      * A request object for use with {@link MainThreadHandler}. Requesters should wait() on the
@@ -172,6 +228,128 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                     }
                     break;
 
+                case MSG_TO_RIL_SWITCH_DATA_NETWORK_SIM_1:
+                    ar = (AsyncResult)msg.obj;
+                    if (mConnectivityManager == null)
+                        mConnectivityManager= (ConnectivityManager)mApp.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+                    if (ar.exception == null) {
+                        mConnectivityManager.onSwitchToSim1DataNetworkCallback(true);
+                    } else {
+                        mConnectivityManager.onSwitchToSim1DataNetworkCallback(false);
+                    }
+
+                    break;
+
+                case MSG_TO_RIL_SWITCH_DATA_NETWORK_SIM_2:
+                    ar = (AsyncResult)msg.obj;
+                    if (mConnectivityManager == null)
+                        mConnectivityManager= (ConnectivityManager)mApp.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+                    if (ar.exception == null) {
+                        mConnectivityManager.onSwitchToSim2DataNetworkCallback(true);
+                    } else {
+                        mConnectivityManager.onSwitchToSim2DataNetworkCallback(false);
+                    }
+
+                    break;
+
+                case MSG_TO_RIL_SWITCH_SPECIFIC_DATA_NETWORK_SIM_1:
+                    ar = (AsyncResult)msg.obj;
+                    if (mConnectivityManager == null)
+                        mConnectivityManager= (ConnectivityManager)mApp.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+                    if (ar.exception == null) {
+                        mConnectivityManager.onSwitchToSim1DataNetworkCallback(true, mSpeNetworkType);
+                    } else {
+                        mConnectivityManager.onSwitchToSim1DataNetworkCallback(false);
+                    }
+                    break;
+
+                case MSG_TO_RIL_SWITCH_SPECIFIC_DATA_NETWORK_SIM_2:
+                    ar = (AsyncResult)msg.obj;
+                    if (mConnectivityManager == null)
+                        mConnectivityManager= (ConnectivityManager)mApp.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+                    if (ar.exception == null) {
+                        mConnectivityManager.onSwitchToSim2DataNetworkCallback(true, mSpeNetworkType);
+                    } else {
+                        mConnectivityManager.onSwitchToSim2DataNetworkCallback(false);
+                    }
+                    break;
+
+                case EVENT_EXCHANGE_APDU_DONE:
+                    ar = (AsyncResult) msg.obj;
+                    request = (MainThreadRequest) ar.userObj;
+                    if (ar.exception == null && ar.result != null) {
+                        request.result = ar.result;
+                        lastError = 0;
+                    } else {
+                        request.result = new IccIoResult(0x6f, 0,
+                                (byte[])null);
+                        lastError = 1;
+                        if ((ar.exception != null) &&
+                                (ar.exception instanceof CommandException)) {
+                            if (((CommandException)ar.exception)
+                                    .getCommandError() ==
+                                    CommandException.Error.INVALID_PARAMETER) {
+                                lastError = 5;
+                            }
+                        }
+                    }
+                    synchronized (request) {
+                        request.notifyAll();
+                    }
+                    break;
+
+                case EVENT_OPEN_CHANNEL_DONE:
+                    ar = (AsyncResult) msg.obj;
+                    request = (MainThreadRequest) ar.userObj;
+                    if (ar.exception == null && ar.result != null) {
+                        request.result = new Integer(((int[])ar.result)[0]);
+                        lastError = 0;
+                    } else {
+                        request.result = new Integer(0);
+                        lastError = 1;
+                        if ((ar.exception != null) &&
+                                (ar.exception instanceof CommandException)) {
+                            if (((CommandException)ar.exception)
+                                    .getCommandError() ==
+                                    CommandException.Error.MISSING_RESOURCE) {
+                                lastError = 2;
+                            } else {
+                                if (((CommandException)ar.exception)
+                                    .getCommandError() ==
+                                    CommandException.Error.NO_SUCH_ELEMENT) {
+                                    lastError = 3;
+                                }
+                            }
+                        }
+                    }
+                    synchronized (request) {
+                        request.notifyAll();
+                    }
+                    break;
+
+                case EVENT_CLOSE_CHANNEL_DONE:
+                    ar = (AsyncResult) msg.obj;
+                    request = (MainThreadRequest) ar.userObj;
+                    if (ar.exception == null) {
+                        request.result = new Integer(0);
+                        lastError = 0;
+                    } else {
+                        request.result = new Integer(-1);
+                        lastError = 1;
+                        if ((ar.exception != null) &&
+                                (ar.exception instanceof CommandException)) {
+                            if (((CommandException)ar.exception)
+                                    .getCommandError() ==
+                                    CommandException.Error.INVALID_PARAMETER) {
+                                lastError = 5;
+                            }
+                        }
+                    }
+                    synchronized (request) {
+                        request.notifyAll();
+                    }
+                    break;
+
                 default:
                     Log.w(LOG_TAG, "MainThreadHandler: unexpected message code: " + msg.what);
                     break;
@@ -220,13 +398,20 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      * Initialize the singleton PhoneInterfaceManager instance.
      * This is only done once, at startup, from PhoneApp.onCreate().
      */
-    /* package */ static PhoneInterfaceManager init(PhoneGlobals app, Phone phone,
-            CallHandlerServiceProxy callHandlerService) {
+    /* package */ static PhoneInterfaceManager[] init(PhoneGlobals app, Phone phone[],
+             CallHandlerServiceProxy callHandlerService) {
         synchronized (PhoneInterfaceManager.class) {
-            if (sInstance == null) {
-                sInstance = new PhoneInterfaceManager(app, phone, callHandlerService);
+            if (sInstance[SimCardID.ID_ZERO.toInt()] == null) {
+                sInstance[SimCardID.ID_ZERO.toInt()] = new PhoneInterfaceManager(app, phone[SimCardID.ID_ZERO.toInt()], callHandlerService);
             } else {
-                Log.wtf(LOG_TAG, "init() called multiple times!  sInstance = " + sInstance);
+                Log.wtf(LOG_TAG, "init() called multiple times!  sInstance[0] = " + sInstance[SimCardID.ID_ZERO.toInt()]);
+            }
+            if (PhoneUtils.isDualMode) {
+                if (sInstance[SimCardID.ID_ONE.toInt()] == null) {
+                    sInstance[SimCardID.ID_ONE.toInt()] = new PhoneInterfaceManager(app, phone[SimCardID.ID_ONE.toInt()], callHandlerService);
+                } else {
+                    Log.wtf(LOG_TAG, "init() called multiple times!  sInstance[1] = " + sInstance[SimCardID.ID_ONE.toInt()]);
+                }
             }
             return sInstance;
         }
@@ -234,7 +419,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
     /** Private constructor; @see init() */
     private PhoneInterfaceManager(PhoneGlobals app, Phone phone,
-            CallHandlerServiceProxy callHandlerService) {
+             CallHandlerServiceProxy callHandlerService) {
         mApp = app;
         mPhone = phone;
         mCM = PhoneGlobals.getInstance().mCM;
@@ -247,7 +432,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     private void publish() {
         if (DBG) log("publish: " + this);
 
-        ServiceManager.addService("phone", this);
+        if(SimCardID.ID_ZERO == mPhone.getSimCardId()) {
+            ServiceManager.addService(Context.TELEPHONY_SERVICE1, this);
+        } else {
+            ServiceManager.addService(Context.TELEPHONY_SERVICE2, this);
+        }
     }
 
     //
@@ -292,8 +481,12 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
             return;
         }
 
+        SimCardID simCardId = mPhone.getSimCardId();
+        if (DBG) log("call: " + number + ", from sim_" + simCardId.toInt());
+
         Intent intent = new Intent(Intent.ACTION_CALL, Uri.parse(url));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.putExtra("simId", simCardId);
         mApp.startActivity(intent);
     }
 
@@ -361,6 +554,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     private void answerRingingCallInternal() {
         final boolean hasRingingCall = !mPhone.getRingingCall().isIdle();
         if (hasRingingCall) {
+            //mApp.switchToPhone(mPhone.getSimCardId());
             final boolean hasActiveCall = !mPhone.getForegroundCall().isIdle();
             final boolean hasHoldingCall = !mPhone.getBackgroundCall().isIdle();
             if (hasActiveCall && hasHoldingCall) {
@@ -392,6 +586,10 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         sendRequestAsync(CMD_SILENCE_RINGER);
     }
 
+    private CallNotifier getNotifier(Phone phone) {
+        return mApp.notifier[phone.getSimCardId().toInt()];
+    }
+
     /**
      * Internal implemenation of silenceRinger().
      * This should only be called from the main thread of the Phone app.
@@ -399,10 +597,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      */
     private void silenceRingerInternal() {
         if ((mCM.getState() == PhoneConstants.State.RINGING)
-            && mApp.notifier.isRinging()) {
+            && getNotifier(mPhone).isRinging()) {
             // Ringer is actually playing, so silence it.
             if (DBG) log("silenceRingerInternal: silencing...");
-            mApp.notifier.silenceRinger();
+            //PhoneUtils.setAudioControlState(PhoneUtils.AUDIO_IDLE);
+            getNotifier(mPhone).silenceRinger();
         }
     }
 
@@ -449,6 +648,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         return checkSimPuk.unlockSim(puk, pin);
     }
 
+    public int getPinRemainingStatus(int type){
+        enforceModifyPermission();
+        return mPhone.getIccCard().getPinRemainingStatus(type);
+    }
+
     /**
      * Helper thread to turn async call to SimCard#supplyPin into
      * a synchronous one.
@@ -466,6 +670,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
         // For async handler to identify request type
         private static final int SUPPLY_PIN_COMPLETE = 100;
+        private static final int SUPPLY_PUK_COMPLETE = 102;
 
         public UnlockSim(IccCard simCard) {
             mSimCard = simCard;
@@ -495,6 +700,14 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                                     } else {
                                         mResult = PhoneConstants.PIN_RESULT_SUCCESS;
                                     }
+                                    mDone = true;
+                                    UnlockSim.this.notifyAll();
+                                }
+                                break;
+                            case SUPPLY_PUK_COMPLETE:
+                                Log.d(LOG_TAG, "SUPPLY_PUK_COMPLETE");
+                                synchronized (UnlockSim.this) {
+                                    mResult = (ar.exception == null);
                                     mDone = true;
                                     UnlockSim.this.notifyAll();
                                 }
@@ -567,6 +780,10 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         enforceModifyPermission();
         if ((mPhone.getServiceState().getVoiceRegState() != ServiceState.STATE_POWER_OFF) != turnOn) {
             toggleRadioOnOff();
+        } else if(mPhone.getServiceState().getState()== ServiceState.STATE_POWER_OFF &&  !turnOn){
+            Log.i(LOG_TAG, "send INTENT_ACTION_CANCEL_POWER_ON_TIMER to clear power on timer");
+            Intent intent = new Intent(INTENT_ACTION_CANCEL_POWER_ON_TIMER);
+            mPhone.getContext().sendBroadcast(intent);
         }
         return true;
     }
@@ -896,5 +1113,106 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      */
     public int getLteOnCdmaMode() {
         return mPhone.getLteOnCdmaMode();
+    }
+
+    private String exchangeIccAPDU(int cla, int command,
+            int channel, int p1, int p2, int p3, String data) {
+        return "";
+    }
+
+    public String transmitIccBasicChannel(int cla, int command,
+            int p1, int p2, int p3, String data) {
+        return exchangeIccAPDU(cla, command, 0, p1, p2, p3, data);
+    }
+
+    public String transmitIccLogicalChannel(int cla, int command,
+            int channel, int p1, int p2, int p3, String data) {
+        return exchangeIccAPDU(cla, command, channel, p1, p2, p3, data);
+    }
+
+    public int openIccLogicalChannel(String AID) {
+        return 0;
+    }
+
+    public boolean closeIccLogicalChannel(int channel) {
+        return false;
+    }
+
+    public int getLastError() {
+        return lastError;
+    }
+
+    /**
+     * Get Active Phone Name.
+     *
+     * In general, the interface only used in dual sim mode.
+     *
+     * return: null if there is no active phone, otherwise "PHONE1" or "PHONE2".
+     */
+    public  int getActivePhoneId() {
+        enforceModifyPermission();
+        if (PhoneUtils.isDualMode) {
+            return mApp.getCallScreenActiveSimCardId().toInt();
+        } else {
+            return SimCardID.ID_ZERO.toInt();
+        }
+    }
+    public int getDefaultSimForVoiceCalls(){
+        if (PhoneUtils.isDualMode) {
+            return SystemProperties.getInt(PROPERTY_CALL_DEFAULT_SIM_ID, SimCardID.ID_ZERO.toInt());
+        } else {
+            return SimCardID.ID_ZERO.toInt();
+        }
+    }
+
+    public int getPreferredDataActivity() {
+        if (PhoneUtils.isDualMode) {
+            return SystemProperties.getInt(PROPERTY_DATA_PREFER_SIM_ID, SimCardID.ID_ZERO.toInt());
+        } else {
+            return SimCardID.ID_ZERO.toInt();
+        }
+    }
+
+    /**
+     *@hide
+     */
+    public void switchToSim1DataNetwork(){
+        if (PhoneUtils.isDualMode) {
+            mPhone.invokeOemRilRequestRaw(RAW_HOOK_OEM_CMD_SIM_1,
+                mMainThreadHandler.obtainMessage(MSG_TO_RIL_SWITCH_DATA_NETWORK_SIM_1));
+        }
+    }
+
+    /**
+     *@hide
+     */
+    public void switchToSim2DataNetwork(){
+        if (PhoneUtils.isDualMode) {
+            mPhone.invokeOemRilRequestRaw(RAW_HOOK_OEM_CMD_SIM_2,
+                mMainThreadHandler.obtainMessage(MSG_TO_RIL_SWITCH_DATA_NETWORK_SIM_2));
+        }
+    }
+
+    /**
+     *@switch to MMS directly, skip default apn
+     */
+    public void switchToSim1DataNetworkEx(int networkType){
+        if (PhoneUtils.isDualMode) {
+            mSpeNetworkType = networkType;
+            mPhone.invokeOemRilRequestRaw(RAW_HOOK_OEM_CMD_SIM_1,
+                mMainThreadHandler.obtainMessage(MSG_TO_RIL_SWITCH_SPECIFIC_DATA_NETWORK_SIM_1));
+        }
+    }
+
+    /**
+     *@switch to MMS directly, skip default apn
+     *
+     */
+    public void switchToSim2DataNetworkEx(int networkType){
+        if (PhoneUtils.isDualMode) {
+            mSpeNetworkType = networkType;
+            mPhone.invokeOemRilRequestRaw(RAW_HOOK_OEM_CMD_SIM_2,
+                mMainThreadHandler.obtainMessage(MSG_TO_RIL_SWITCH_SPECIFIC_DATA_NETWORK_SIM_2));
+        }
     }
 }

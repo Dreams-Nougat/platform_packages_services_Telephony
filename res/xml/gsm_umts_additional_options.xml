@@ -21,4 +21,14 @@
         android:summaryOn="@string/sum_cw_enabled"
         android:summaryOff="@string/sum_cw_disabled"
         android:enabled="false"/>
+
+    <PreferenceScreen
+        android:key="button_cb_key"
+        android:title="@string/labelCB"
+        android:persistent="false">
+        <intent android:action="android.intent.action.MAIN"
+            android:targetPackage="com.android.phone"
+            android:targetClass="com.android.phone.CallBarringSetting"
+            android:data="0"/>
+    </PreferenceScreen>
 </PreferenceScreen>

@@ -27,6 +27,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+
 /**
  * A simple activity that presents you with a UI for faking incoming phone operations.
  */
@@ -54,10 +56,10 @@ public class FakePhoneActivity extends Activity {
                     }
                 });
 
-        mRadioControl = PhoneGlobals.getPhone().getSimulatedRadioControl();
+        mRadioControl = PhoneGlobals.getPhone(PhoneGlobals.getInstance().getCallScreenActiveSimCardId()).getSimulatedRadioControl();
 
         Log.i(TAG, "- PhoneApp.getInstance(): " + PhoneGlobals.getInstance());
-        Log.i(TAG, "- PhoneApp.getPhone(): " + PhoneGlobals.getPhone());
+        Log.i(TAG, "- PhoneApp.getPhone(): " + PhoneGlobals.getPhone(PhoneGlobals.getInstance().getCallScreenActiveSimCardId()));
         Log.i(TAG, "- mRadioControl: " + mRadioControl);
     }
 

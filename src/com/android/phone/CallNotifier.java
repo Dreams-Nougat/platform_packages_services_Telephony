@@ -29,6 +29,7 @@ import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaDisplayInfoRec;
 import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaSignalInfoRec;
 import com.android.internal.telephony.cdma.SignalToneUtil;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import android.app.ActivityManagerNative;
 import android.bluetooth.BluetoothAdapter;
@@ -44,6 +45,7 @@ import android.os.Message;
 import android.os.SystemProperties;
 import android.os.SystemVibrator;
 import android.os.Vibrator;
+import android.os.SystemClock;
 import android.provider.CallLog.Calls;
 import android.provider.Settings;
 import android.telephony.PhoneNumberUtils;
@@ -79,7 +81,7 @@ public class CallNotifier extends Handler
     private static final int DISPLAYINFO_NOTIFICATION_TIME = 2000; // msec
 
     /** The singleton instance. */
-    private static CallNotifier sInstance;
+    private static CallNotifier sInstance[] = {null,null};
 
     // Boolean to keep track of whether or not a CDMA Call Waiting call timed out.
     //
@@ -136,6 +138,7 @@ public class CallNotifier extends Handler
 
     private PhoneGlobals mApplication;
     private CallManager mCM;
+    private Phone mPhone;
     private Ringer mRinger;
     private BluetoothHeadset mBluetoothHeadset;
     private CallLogger mCallLogger;
@@ -172,15 +175,23 @@ public class CallNotifier extends Handler
      * Initialize the singleton CallNotifier instance.
      * This is only done once, at startup, from PhoneApp.onCreate().
      */
-    /* package */ static CallNotifier init(PhoneGlobals app, Phone phone, Ringer ringer,
+    /* package */ static CallNotifier[] init(PhoneGlobals app, Phone[] phone, Ringer ringer,
             CallLogger callLogger, CallStateMonitor callStateMonitor,
             BluetoothManager bluetoothManager, CallModeler callModeler) {
         synchronized (CallNotifier.class) {
-            if (sInstance == null) {
-                sInstance = new CallNotifier(app, phone, ringer, callLogger, callStateMonitor,
+            if (sInstance[SimCardID.ID_ZERO.toInt()] == null) {
+                sInstance[SimCardID.ID_ZERO.toInt()] = new CallNotifier(app, phone[SimCardID.ID_ZERO.toInt()], ringer, callLogger, callStateMonitor,
                         bluetoothManager, callModeler);
             } else {
-                Log.wtf(LOG_TAG, "init() called multiple times!  sInstance = " + sInstance);
+                Log.wtf(LOG_TAG, "init() called multiple times!  sInstance[0] = " + sInstance[0]);
+            }
+            if (PhoneUtils.isDualMode) {
+                   if (sInstance[SimCardID.ID_ONE.toInt()] == null) {
+                       sInstance[SimCardID.ID_ONE.toInt()] = new CallNotifier(app, phone[SimCardID.ID_ONE.toInt()], ringer, callLogger, callStateMonitor,
+                        bluetoothManager, callModeler);
+                   } else {
+                       Log.wtf(LOG_TAG, "init() called multiple times!  sInstance[1] = " + sInstance[1]);
+                   }
             }
             return sInstance;
         }
@@ -193,6 +204,7 @@ public class CallNotifier extends Handler
         mApplication = app;
         mCM = app.mCM;
         mCallLogger = callLogger;
+        mPhone = phone;
         mBluetoothManager = bluetoothManager;
         mCallModeler = callModeler;
 
@@ -210,8 +222,14 @@ public class CallNotifier extends Handler
                                     BluetoothProfile.HEADSET);
         }
 
-        TelephonyManager telephonyManager = (TelephonyManager)app.getSystemService(
-                Context.TELEPHONY_SERVICE);
+        TelephonyManager telephonyManager;
+        if(SimCardID.ID_ZERO == mPhone.getSimCardId()) {
+            telephonyManager = (TelephonyManager)app.getSystemService(
+                Context.TELEPHONY_SERVICE1);
+        } else {
+            telephonyManager = (TelephonyManager)app.getSystemService(
+                    Context.TELEPHONY_SERVICE2);
+        }
         telephonyManager.listen(mPhoneStateListener,
                 PhoneStateListener.LISTEN_MESSAGE_WAITING_INDICATOR
                 | PhoneStateListener.LISTEN_CALL_FORWARDING_INDICATOR);
@@ -239,9 +257,17 @@ public class CallNotifier extends Handler
 
     @Override
     public void handleMessage(Message msg) {
+        AsyncResult ar;
+        Phone phone;
+        SimCardID simId;
+
         switch (msg.what) {
             case CallStateMonitor.PHONE_NEW_RINGING_CONNECTION:
                 log("RINGING... (new)");
+                /* dual sim */
+                if(!checkTheSameSimCardId((AsyncResult) msg.obj))
+                    break;
+                mRinger.setActivePhone(mPhone.getSimCardId());
                 onNewRingingConnection((AsyncResult) msg.obj);
                 mSilentRingerRequested = false;
                 break;
@@ -253,7 +279,8 @@ public class CallNotifier extends Handler
                     PhoneBase pb =  (PhoneBase)((AsyncResult)msg.obj).result;
 
                     if ((pb.getState() == PhoneConstants.State.RINGING)
-                            && (mSilentRingerRequested == false)) {
+                            && (mSilentRingerRequested == false)
+                            && isAllowRinging() == true) {
                         if (DBG) log("RINGING... (PHONE_INCOMING_RING event)");
                         mRinger.ring();
                     } else {
@@ -263,15 +290,36 @@ public class CallNotifier extends Handler
                 break;
 
             case CallStateMonitor.PHONE_STATE_CHANGED:
+                /* dual sim */
+                ar = (AsyncResult) msg.obj;
+                phone = (Phone) ar.result;
+                if (mPhone.getSimCardId() != phone.getSimCardId()) {
+                    if (DBG) {
+                        log("PHONE_STATE_CHANGED: event simId = " + phone.getSimCardId().toInt() + " != CallNotifier simId = " + mPhone.getSimCardId().toInt());
+                    }
+                    break;
+                }
                 onPhoneStateChanged((AsyncResult) msg.obj);
                 break;
 
             case CallStateMonitor.PHONE_DISCONNECT:
                 if (DBG) log("DISCONNECT");
+                /* dual sim */
+                if(!checkTheSameSimCardId((AsyncResult) msg.obj))
+                    break;
                 onDisconnect((AsyncResult) msg.obj);
                 break;
 
             case CallStateMonitor.PHONE_UNKNOWN_CONNECTION_APPEARED:
+                ar = (AsyncResult) msg.obj;
+                phone = (Phone) ar.result;
+                if (mPhone.getSimCardId() != phone.getSimCardId()) {
+                    if (DBG) {
+                        log("PHONE_UNKNOWN_CONNECTION_APPEARED: event simId = " + phone.getSimCardId().toInt() + " != CallNotifier simId = " + mPhone.getSimCardId().toInt());
+                    }
+                    break;
+                }
+
                 onUnknownConnectionAppeared((AsyncResult) msg.obj);
                 break;
 
@@ -280,7 +328,7 @@ public class CallNotifier extends Handler
                 break;
 
             case PHONE_MWI_CHANGED:
-                onMwiChanged(mApplication.phone.getMessageWaitingIndicator());
+                onMwiChanged(mPhone.getMessageWaitingIndicator());
                 break;
 
             case CallStateMonitor.PHONE_CDMA_CALL_WAITING:
@@ -302,7 +350,7 @@ public class CallNotifier extends Handler
             case CALLWAITING_ADDCALL_DISABLE_TIMEOUT:
                 if (DBG) log("Received CALLWAITING_ADDCALL_DISABLE_TIMEOUT event ...");
                 // Set the mAddCallMenuStateAfterCW state to true
-                mApplication.cdmaPhoneCallState.setAddCallMenuStateAfterCallWaiting(true);
+                mApplication.cdmaPhoneCallState[mPhone.getSimCardId().toInt()].setAddCallMenuStateAfterCallWaiting(true);
                 break;
 
             case CallStateMonitor.PHONE_STATE_DISPLAYINFO:
@@ -327,6 +375,15 @@ public class CallNotifier extends Handler
 
             case CallStateMonitor.PHONE_ENHANCED_VP_ON:
                 if (DBG) log("PHONE_ENHANCED_VP_ON...");
+                /* dual sim */
+                ar = (AsyncResult) msg.obj;
+                simId = (SimCardID) ar.result;
+                if (mPhone.getSimCardId() != simId) {
+                    if (DBG) {
+                        log("PHONE_ENHANCED_VP_ON: event simId = " + simId.toInt() + " != CallNotifier simId = " + mPhone.getSimCardId().toInt());
+                    }
+                    break;
+                }
                 if (!mVoicePrivacyState) {
                     int toneToPlay = InCallTonePlayer.TONE_VOICE_PRIVACY;
                     new InCallTonePlayer(toneToPlay).start();
@@ -336,6 +393,15 @@ public class CallNotifier extends Handler
 
             case CallStateMonitor.PHONE_ENHANCED_VP_OFF:
                 if (DBG) log("PHONE_ENHANCED_VP_OFF...");
+                /* dual sim */
+                ar = (AsyncResult) msg.obj;
+                simId = (SimCardID) ar.result;
+                if (mPhone.getSimCardId() != simId) {
+                    if (DBG) {
+                        log("PHONE_ENHANCED_VP_OFF: event simId = " + simId.toInt() + " != CallNotifier simId = " + mPhone.getSimCardId().toInt());
+                    }
+                    break;
+                }
                 if (mVoicePrivacyState) {
                     int toneToPlay = InCallTonePlayer.TONE_VOICE_PRIVACY;
                     new InCallTonePlayer(toneToPlay).start();
@@ -348,6 +414,13 @@ public class CallNotifier extends Handler
                 break;
 
             case CallStateMonitor.PHONE_RESEND_MUTE:
+                /* dual sim */
+                ar = (AsyncResult) msg.obj;
+                simId = (SimCardID) ar.userObj;
+                if (mPhone.getSimCardId() != simId) {
+                    if (DBG) log("PHONE_RESEND_MUTE: event simId = " + simId.toInt() + " != CallNotifier simId = " + mPhone.getSimCardId().toInt());
+                    break;
+                }
                 onResendMute();
                 break;
 
@@ -367,6 +440,16 @@ public class CallNotifier extends Handler
             onCfiChanged(cfi);
         }
     };
+
+    /* dual sim */
+    boolean checkTheSameSimCardId(AsyncResult r){
+        Connection c = (Connection) r.result;
+        if (DBG){
+            log("===> The SimCardId of Connection: " + c.getCall().getPhone().getSimCardId().toInt());
+            log("===> The SimCardId of CallNotifier: " + mPhone.getSimCardId().toInt());
+        }
+        return(mPhone.getSimCardId() == c.getCall().getPhone().getSimCardId());
+    }
 
     /**
      * Handles a "new ringing connection" event from the telephony layer.
@@ -545,7 +628,11 @@ public class CallNotifier extends Handler
         }
         if (shouldStartQuery) {
             // Reset the ringtone to the default first.
-            mRinger.setCustomRingtoneUri(Settings.System.DEFAULT_RINGTONE_URI);
+            if(mPhone.getSimCardId() == SimCardID.ID_ONE) {
+                mRinger.setCustomRingtoneUri(Settings.System.DEFAULT_RINGTONE_URI_2, mPhone.getSimCardId());
+            } else {
+                mRinger.setCustomRingtoneUri(Settings.System.DEFAULT_RINGTONE_URI, mPhone.getSimCardId());
+            }
 
             // query the callerinfo to try to get the ringer.
             PhoneUtils.CallerInfoToken cit = PhoneUtils.startGetCallerInfo(
@@ -736,7 +823,7 @@ public class CallNotifier extends Handler
         if (fgPhone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
             Connection c = fgPhone.getForegroundCall().getLatestConnection();
             if ((c != null) && (PhoneNumberUtils.isLocalEmergencyNumber(c.getAddress(),
-                                                                        mApplication))) {
+                                             mApplication,  fgPhone.getSimCardId()))) {
                 if (VDBG) log("onPhoneStateChanged: it is an emergency call.");
                 Call.State callState = fgPhone.getForegroundCall().getState();
                 if (mEmergencyTonePlayerVibrator == null) {
@@ -836,7 +923,7 @@ public class CallNotifier extends Handler
                 if (ci.contactRingtoneUri != null) {
                     if (DBG) log("custom ringtone found, setting up ringer.");
                     Ringer r = mRinger;
-                    r.setCustomRingtoneUri(ci.contactRingtoneUri);
+                    r.setCustomRingtoneUri(ci.contactRingtoneUri, mCM.getFirstActiveRingingCall().getPhone().getSimCardId());
                 }
                 // ring, and other post-ring actions.
                 onCustomRingQueryComplete(c);
@@ -906,6 +993,9 @@ public class CallNotifier extends Handler
             Log.w(LOG_TAG, "onDisconnect: null connection");
         }
 
+        //dual sim, Used to check the "phone SIM ID of connection" is same SimCardId with the Notifier or not.
+        final boolean isCallNotifierPhone = (mPhone.getSimCardId() == c.getCall().getPhone().getSimCardId());
+
         int autoretrySetting = 0;
         if ((c != null) && (c.getCall().getPhone().getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA)) {
             autoretrySetting = android.provider.Settings.Global.getInt(mApplication.
@@ -917,7 +1007,7 @@ public class CallNotifier extends Handler
 
         if ((c != null) && (c.getCall().getPhone().getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA)) {
             // Resetting the CdmaPhoneCallState members
-            mApplication.cdmaPhoneCallState.resetCdmaPhoneCallState();
+            mApplication.cdmaPhoneCallState[c.getCall().getPhone().getSimCardId().toInt()].resetCdmaPhoneCallState();
 
             // Remove Call waiting timers
             removeMessages(CALLWAITING_CALLERINFO_DISPLAY_DONE);
@@ -944,6 +1034,7 @@ public class CallNotifier extends Handler
                 // area as the Out going Call never got connected
                 if (DBG) log("cancelCallInProgressNotifications()... (onDisconnect)");
                 mApplication.notificationMgr.cancelCallInProgressNotifications();
+                mApplication.updateWakeState();
             } else {
                 if (DBG) log("stopRing()... (onDisconnect)");
                 mRinger.stopRing();
@@ -1043,7 +1134,7 @@ public class CallNotifier extends Handler
             final String number = c.getAddress();
             final Phone phone = c.getCall().getPhone();
             final boolean isEmergencyNumber =
-                    PhoneNumberUtils.isLocalEmergencyNumber(number, mApplication);
+                    PhoneNumberUtils.isLocalEmergencyNumber(number, mApplication, phone.getSimCardId());
 
             if (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
                 if ((isEmergencyNumber)
@@ -1058,13 +1149,17 @@ public class CallNotifier extends Handler
             final Connection.DisconnectCause cause = c.getDisconnectCause();
             final boolean missedCall = c.isIncoming() &&
                     (cause == Connection.DisconnectCause.INCOMING_MISSED);
-            if (missedCall) {
-                // Show the "Missed call" notification.
-                // (Note we *don't* do this if this was an incoming call that
-                // the user deliberately rejected.)
-                showMissedCallNotification(c, date);
-            }
 
+            /* dual sim, If "phone SimCardId of connection" is not same with Notifier, *
+                     * we do not show miss call notification on the statusbar */
+            if (isCallNotifierPhone) {
+                if (missedCall) {
+                    // Show the "Missed call" notification.
+                    // (Note we *don't* do this if this was an incoming call that
+                    // the user deliberately rejected.)
+                    showMissedCallNotification(c, date);
+                }
+            }
             // Possibly play a "post-disconnect tone" thru the earpiece.
             // We do this here, rather than from the InCallScreen
             // activity, since we need to do this even if you're not in
@@ -1155,7 +1250,7 @@ public class CallNotifier extends Handler
 
     private void onCfiChanged(boolean visible) {
         if (VDBG) log("onCfiChanged(): " + visible);
-        mApplication.notificationMgr.updateCfi(visible);
+        mApplication.notificationMgr.updateCfi(visible, mPhone.getSimCardId());
     }
 
     /**
@@ -1166,6 +1261,30 @@ public class CallNotifier extends Handler
     }
 
     /**
+     * Stops the current ring
+     */
+    void stopRinger() {
+        if (DBG) log(" only stop Ringer... ");
+        mRinger.stopRing();
+    }
+
+    /**
+     * set active phone first and start Ringing
+     */
+    void startRinging() {
+        if (DBG) log(" start ringing... ");
+        mRinger.ring();
+    }
+
+    /**
+     * set ringer active phone
+     */
+    void setRingerActivePhone(SimCardID simCardId) {
+        if (DBG) log(" set Ringer Active Phone... ");
+        mRinger.setActivePhone(simCardId);
+    }
+
+    /**
      * Stops the current ring, and tells the notifier that future
      * ring requests should be ignored.
      */
@@ -1173,6 +1292,36 @@ public class CallNotifier extends Handler
         mSilentRingerRequested = true;
         if (DBG) log("stopRing()... (silenceRinger)");
         mRinger.stopRing();
+    }
+
+    /** Dual sim
+     *  allow ringing or not when incoming call
+     */
+    boolean isAllowRinging() {
+        boolean allowRinging = true;
+
+        //first figure out the incoming call is call waiting or not
+        Call ringingCall = mPhone.getRingingCall();
+        if (DBG) log("---ringingCall state:" + ringingCall.getState());
+        //<allow ring only INCOMING status, for dual sim>
+        if (!ringingCall.isRinging()  || ringingCall.getState() == Call.State.WAITING ){
+            allowRinging = false;
+        }
+
+        //second figure out the another phone/sim call state
+        if ((allowRinging) && (PhoneUtils.isDualMode)) {
+            Phone anotherPhone = getAnotherPhone();
+            Call ringingCall2 = anotherPhone.getRingingCall();
+            if (DBG) log("---ringingCall2 state:" + ringingCall2.getState());
+
+            if (anotherPhone.getState() == PhoneConstants.State.OFFHOOK
+                || (ringingCall2!=null && (ringingCall2.isRinging() && ringingCall2.getState() == Call.State.WAITING))
+                ){
+                allowRinging = false;
+            }
+        }
+
+        return allowRinging;
     }
 
     /**
@@ -1194,6 +1343,23 @@ public class CallNotifier extends Handler
         if (ringingCall.getState() == Call.State.INCOMING) {
             mRinger.ring();
         }
+    }
+
+    private Phone getAnotherPhone() {
+        Phone anotherPhone;
+
+        if (DBG) log("----getAnotherPhone()...");
+
+        if (SimCardID.ID_ONE == mPhone.getSimCardId())
+        {
+            anotherPhone = mApplication.phone[SimCardID.ID_ZERO.toInt()];
+        }
+        else
+        {
+            anotherPhone = mApplication.phone[SimCardID.ID_ONE.toInt()];
+        }
+
+        return anotherPhone;
     }
 
     /**
@@ -1573,7 +1739,7 @@ public class CallNotifier extends Handler
 
         // Set the Phone Call State to SINGLE_ACTIVE as there is only one connection
         // else we would not have received Call waiting
-        mApplication.cdmaPhoneCallState.setCurrentCallState(
+        mApplication.cdmaPhoneCallState[mPhone.getSimCardId().toInt()].setCurrentCallState(
                 CdmaPhoneCallState.PhoneCallState.SINGLE_ACTIVE);
 
         // Start timer for CW display
@@ -1582,7 +1748,7 @@ public class CallNotifier extends Handler
                 CALLWAITING_CALLERINFO_DISPLAY_TIME);
 
         // Set the mAddCallMenuStateAfterCW state to false
-        mApplication.cdmaPhoneCallState.setAddCallMenuStateAfterCallWaiting(false);
+        mApplication.cdmaPhoneCallState[mPhone.getSimCardId().toInt()].setAddCallMenuStateAfterCallWaiting(false);
 
         // Start the timer for disabling "Add Call" menu option
         sendEmptyMessageDelayed(CALLWAITING_ADDCALL_DISABLE_TIMEOUT,
@@ -1810,6 +1976,12 @@ public class CallNotifier extends Handler
 
     private void onRingbackTone(AsyncResult r) {
         boolean playTone = (Boolean)(r.result);
+        SimCardID simId = (SimCardID) r.userObj;
+
+        if (mPhone.getSimCardId() != simId) {
+            if (DBG) log("onRingbackTone(): event simId = " + simId.toInt() + " != CallNotifier simId = " + mPhone.getSimCardId().toInt());
+            return;
+        }
 
         if (playTone == true) {
             // Only play when foreground call is in DIALING or ALERTING.
@@ -1839,6 +2011,7 @@ public class CallNotifier extends Handler
     }
 
     private void log(String msg) {
-        Log.d(LOG_TAG, msg);
+        Log.d(LOG_TAG, "[CallNotifier_"+String.valueOf(mPhone.getSimCardId().toInt())+"] "+ msg);
+
     }
 }

@@ -28,6 +28,8 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.CommandException;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -51,6 +53,7 @@ public class NetworkQueryService extends Service {
     // error statuses that will be retured in the callback.
     public static final int QUERY_OK = 0;
     public static final int QUERY_EXCEPTION = 1;
+    public static final int QUERY_EXCEPTION_OP_NOT_ALLOWED_DURING_VOICE_CALL = 2;
     
     /** state of the query service */
     private int mState;
@@ -157,7 +160,7 @@ public class NetworkQueryService extends Service {
     @Override
     public void onCreate() {
         mState = QUERY_READY;
-        mPhone = PhoneFactory.getDefaultPhone();
+        mPhone = PhoneFactory.getDefaultPhone(SimCardID.ID_ZERO);
     }
     
     /**
@@ -197,6 +200,15 @@ public class NetworkQueryService extends Service {
             // TODO: we may need greater accuracy here, but for now, just a
             // simple status integer will suffice.
             int exception = (ar.exception == null) ? QUERY_OK : QUERY_EXCEPTION;
+            if(ar.exception != null && CommandException.class.isInstance(ar.exception) ) {
+                CommandException rilEx = (CommandException)ar.exception;
+                if(rilEx.getCommandError() == CommandException.Error.OP_NOT_ALLOWED_DURING_VOICE_CALL) {
+                    exception = QUERY_EXCEPTION_OP_NOT_ALLOWED_DURING_VOICE_CALL;
+                }
+                else {
+                    exception = QUERY_EXCEPTION;
+                }
+            }
             if (DBG) log("AsyncResult has exception " + exception);
             
             // Make the calls to all the registered callbacks.

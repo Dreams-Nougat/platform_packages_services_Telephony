@@ -30,6 +30,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.Phone;
 import com.google.common.base.Preconditions;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * Starts and displays status for Hands Free Activation (HFA).
@@ -132,7 +133,8 @@ public class HfaLogic {
     }
 
     private void bounceRadio() {
-        final Phone phone = PhoneGlobals.getInstance().getPhone();
+/*jw TODO need to handle dual sim*/
+        final Phone phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         phone.registerForServiceStateChanged(mHandler, SERVICE_STATE_CHANGED, null);
 
         mPhoneMonitorState = WAITING_FOR_RADIO_OFF;
@@ -142,7 +144,8 @@ public class HfaLogic {
 
     private void onServiceStateChange(ServiceState state) {
         final boolean radioIsOff = state.getVoiceRegState() == ServiceState.STATE_POWER_OFF;
-        final Phone phone = PhoneGlobals.getInstance().getPhone();
+/*jw TODO need to handle dual sim*/
+        final Phone phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
 
         Log.i(TAG, "Radio is on: " + !radioIsOff);
 

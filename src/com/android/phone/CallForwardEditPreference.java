@@ -4,6 +4,7 @@ import com.android.internal.telephony.CallForwardInfo;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import android.app.AlertDialog;
 import android.content.Context;
@@ -43,7 +44,7 @@ public class CallForwardEditPreference extends EditPhoneNumberPreference {
     public CallForwardEditPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        phone = PhoneGlobals.getPhone();
+        phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         mSummaryOnTemplate = this.getSummaryOn();
 
         TypedArray a = context.obtainStyledAttributes(attrs,
@@ -61,7 +62,10 @@ public class CallForwardEditPreference extends EditPhoneNumberPreference {
         this(context, null);
     }
 
-    void init(TimeConsumingPreferenceListener listener, boolean skipReading) {
+    void init(TimeConsumingPreferenceListener listener, boolean skipReading, int simId) {
+		if(simId == SimCardID.ID_ONE.toInt()){
+			phone = PhoneGlobals.getPhone(SimCardID.ID_ONE);
+		}
         tcpListener = listener;
         if (!skipReading) {
             phone.getCallForwardingOption(reason,
@@ -123,12 +127,13 @@ public class CallForwardEditPreference extends EditPhoneNumberPreference {
                 // the interface of Phone.setCallForwardingOption has error:
                 // should be action, reason...
                 phone.setCallForwardingOption(action,
-                        reason,
-                        number,
-                        time,
-                        mHandler.obtainMessage(MyHandler.MESSAGE_SET_CF,
-                                action,
-                                MyHandler.MESSAGE_SET_CF));
+                                              reason,
+                                              number,
+                                              time,
+                                              mHandler.obtainMessage(MyHandler.MESSAGE_SET_CF,
+                                              action,
+                                              MyHandler.MESSAGE_SET_CF));
+
 
                 if (tcpListener != null) {
                     tcpListener.onStarted(this, false);
@@ -259,7 +264,7 @@ public class CallForwardEditPreference extends EditPhoneNumberPreference {
             }
             if (DBG) Log.d(LOG_TAG, "handleSetCFResponse: re get");
             phone.getCallForwardingOption(reason,
-                    obtainMessage(MESSAGE_GET_CF, msg.arg1, MESSAGE_SET_CF, ar.exception));
+                   obtainMessage(MESSAGE_GET_CF, msg.arg1, MESSAGE_SET_CF, ar.exception));
         }
     }
 }

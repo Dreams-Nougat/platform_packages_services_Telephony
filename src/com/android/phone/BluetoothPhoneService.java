@@ -240,9 +240,9 @@ public class BluetoothPhoneService extends Service {
             PhoneGlobals app = PhoneGlobals.getInstance();
             if (app.cdmaPhoneCallState != null) {
                 CdmaPhoneCallState.PhoneCallState currCdmaThreeWayCallState =
-                        app.cdmaPhoneCallState.getCurrentCallState();
+			app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState();
                 CdmaPhoneCallState.PhoneCallState prevCdmaThreeWayCallState =
-                    app.cdmaPhoneCallState.getPreviousCallState();
+			app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getPreviousCallState();
 
                 log("CDMA call state: " + currCdmaThreeWayCallState + " prev state:" +
                     prevCdmaThreeWayCallState);
@@ -255,10 +255,10 @@ public class BluetoothPhoneService extends Service {
                     // sequence
                     log("CDMA 3way call state change. mNumActive: " + mNumActive +
                         " mNumHeld: " + mNumHeld + " IsThreeWayCallOrigStateDialing: " +
-                        app.cdmaPhoneCallState.IsThreeWayCallOrigStateDialing());
+			app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].IsThreeWayCallOrigStateDialing());
                     if ((currCdmaThreeWayCallState ==
                             CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE)
-                                && app.cdmaPhoneCallState.IsThreeWayCallOrigStateDialing()) {
+				&& app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].IsThreeWayCallOrigStateDialing()) {
                         // Mimic dialing, put the call on hold, alerting
                         mBluetoothHeadset.phoneStateChanged(0, mNumHeld,
                             convertCallState(Call.State.IDLE, Call.State.DIALING),
@@ -360,9 +360,9 @@ public class BluetoothPhoneService extends Service {
         PhoneGlobals app = PhoneGlobals.getInstance();
         if (app.cdmaPhoneCallState != null) {
             CdmaPhoneCallState.PhoneCallState curr3WayCallState =
-                app.cdmaPhoneCallState.getCurrentCallState();
+		app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState();
             CdmaPhoneCallState.PhoneCallState prev3WayCallState =
-                app.cdmaPhoneCallState.getPreviousCallState();
+		app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getPreviousCallState();
 
             log("CDMA call state: " + curr3WayCallState + " prev state:" +
                 prev3WayCallState);
@@ -571,11 +571,11 @@ public class BluetoothPhoneService extends Service {
         }
 
         // Update the mCdmaIsSecondCallActive flag based on the Phone call state
-        if (PhoneGlobals.getInstance().cdmaPhoneCallState.getCurrentCallState()
+	if (PhoneGlobals.getInstance().cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState()
                 == CdmaPhoneCallState.PhoneCallState.SINGLE_ACTIVE) {
             Message msg = mHandler.obtainMessage(CDMA_SET_SECOND_CALL_STATE, false);
             mHandler.sendMessage(msg);
-        } else if (PhoneGlobals.getInstance().cdmaPhoneCallState.getCurrentCallState()
+	} else if (PhoneGlobals.getInstance().cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState()
                 == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE) {
             Message msg = mHandler.obtainMessage(CDMA_SET_SECOND_CALL_STATE, true);
             mHandler.sendMessage(msg);
@@ -592,9 +592,9 @@ public class BluetoothPhoneService extends Service {
         int state;
         PhoneGlobals app = PhoneGlobals.getInstance();
         CdmaPhoneCallState.PhoneCallState currCdmaCallState =
-                app.cdmaPhoneCallState.getCurrentCallState();
+		app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState();
         CdmaPhoneCallState.PhoneCallState prevCdmaCallState =
-                app.cdmaPhoneCallState.getPreviousCallState();
+		app.cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getPreviousCallState();
 
         if ((prevCdmaCallState == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE)
                 && (currCdmaCallState == CdmaPhoneCallState.PhoneCallState.CONF_CALL)) {
@@ -750,7 +750,7 @@ public class BluetoothPhoneService extends Service {
                         // Setting the second callers state flag to TRUE (i.e. active)
                         cdmaSetSecondCallState(true);
                         return true;
-                    } else if (PhoneGlobals.getInstance().cdmaPhoneCallState
+		    } else if (PhoneGlobals.getInstance().cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()]
                                .getCurrentCallState()
                                == CdmaPhoneCallState.PhoneCallState.CONF_CALL) {
                         if (VDBG) log("CHLD:2 Swap Calls");
@@ -771,7 +771,7 @@ public class BluetoothPhoneService extends Service {
             } else if (chld == CHLD_TYPE_ADDHELDTOCONF) {
                 if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
                     CdmaPhoneCallState.PhoneCallState state =
-                        PhoneGlobals.getInstance().cdmaPhoneCallState.getCurrentCallState();
+			PhoneGlobals.getInstance().cdmaPhoneCallState[mCM.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState();
                     // For CDMA, we need to check if the call is in THRWAY_ACTIVE state
                     if (state == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE) {
                         if (VDBG) log("CHLD:3 Merge Calls");

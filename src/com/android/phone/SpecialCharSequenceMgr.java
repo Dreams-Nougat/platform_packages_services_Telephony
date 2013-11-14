@@ -25,6 +25,7 @@ import android.content.Intent;
 import android.net.Uri;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
 import android.view.WindowManager;
@@ -198,7 +199,7 @@ public class SpecialCharSequenceMgr {
         if ((input.startsWith("**04") || input.startsWith("**05"))
                 && input.endsWith("#")) {
             PhoneGlobals app = PhoneGlobals.getInstance();
-            boolean isMMIHandled = app.phone.handlePinMmi(input);
+            boolean isMMIHandled = app.phone[SimCardID.ID_ZERO.toInt()].handlePinMmi(input);
 
             // if the PUK code is recognized then indicate to the
             // phone app that an attempt to unPUK the device was
@@ -226,7 +227,7 @@ public class SpecialCharSequenceMgr {
     static private void showDeviceIdPanel(Context context) {
         if (DBG) log("showDeviceIdPanel()...");
 
-        Phone phone = PhoneGlobals.getPhone();
+        Phone phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         int labelId = TelephonyCapabilities.getDeviceIdLabel(phone);
         String deviceId = phone.getDeviceId();
 

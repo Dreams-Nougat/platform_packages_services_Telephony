@@ -24,6 +24,7 @@ import android.app.TaskStackBuilder;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.IBluetoothHeadsetPhone;
 import android.content.ActivityNotFoundException;
+import android.content.AsyncQueryHandler;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -32,7 +33,9 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.database.Cursor;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.AsyncResult;
@@ -49,12 +52,15 @@ import android.os.SystemProperties;
 import android.os.UpdateLock;
 import android.os.UserHandle;
 import android.preference.PreferenceManager;
+import android.provider.Settings;
 import android.provider.Settings.System;
 import android.telephony.ServiceState;
+import android.telephony.SmsManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Slog;
 import android.view.KeyEvent;
+import android.widget.Toast;
 
 import com.android.internal.telephony.Call;
 import com.android.internal.telephony.CallManager;
@@ -64,7 +70,10 @@ import com.android.internal.telephony.MmiCode;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
 import com.android.internal.telephony.TelephonyCapabilities;
+import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.TtyIntent;
 import com.android.phone.common.CallLogAsync;
@@ -72,6 +81,8 @@ import com.android.phone.OtaUtils.CdmaOtaScreenState;
 import com.android.phone.WiredHeadsetManager.WiredHeadsetListener;
 import com.android.server.sip.SipService;
 import com.android.services.telephony.common.AudioMode;
+
+import java.util.Arrays;
 
 /**
  * Global state for the telephony subsystem when running in the primary
@@ -96,7 +107,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
      *
      * ***** DO NOT SUBMIT WITH DBG_LEVEL > 0 *************
      */
-    /* package */ static final int DBG_LEVEL = 0;
+    /* package */ static final int DBG_LEVEL = 2;
 
     private static final boolean DBG =
             (PhoneGlobals.DBG_LEVEL >= 1) && (SystemProperties.getInt("ro.debuggable", 0) == 1);
@@ -104,6 +115,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
 
     // Message codes; see mHandler below.
     private static final int EVENT_SIM_NETWORK_LOCKED = 3;
+    private static final int EVENT_SIM2_NETWORK_LOCKED = 4;
     private static final int EVENT_SIM_STATE_CHANGED = 8;
     private static final int EVENT_DATA_ROAMING_DISCONNECTED = 10;
     private static final int EVENT_DATA_ROAMING_OK = 11;
@@ -113,6 +125,9 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     private static final int EVENT_TTY_MODE_GET = 15;
     private static final int EVENT_TTY_MODE_SET = 16;
     private static final int EVENT_START_SIP_SERVICE = 17;
+
+    /* To process GCF test case 27.16 - SIM ERROR */
+    private static final int EVENT_UNSOL_OEM_HOOK_RAW = 20;
 
     // The MMI codes are also used by the InCallScreen.
     public static final int MMI_INITIATE = 51;
@@ -132,6 +147,14 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         PARTIAL,
         FULL
     }
+
+    /* To process GCF test case 27.16 - SIM ERROR */
+    private class UNSOL_OEM_HOOK_RAW_Type{
+        private static final int BRIL_HOOK_UNSOL_SIM_ERROR = 0;
+    }
+
+    //videophone
+    private static boolean mIsVTLoopbackMode;
 
     /**
      * Intent Action used for hanging up the current call from Notification bar. This will
@@ -161,11 +184,11 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     // directly (rather than thru set/get methods) for efficiency.
     CallController callController;
     CallManager mCM;
-    CallNotifier notifier;
+    CallNotifier notifier[]={null, null};
     CallerInfoCache callerInfoCache;
     NotificationMgr notificationMgr;
-    Phone phone;
-    PhoneInterfaceManager phoneMgr;
+    Phone phone[]={null, null};
+    PhoneInterfaceManager phoneMgr[]={null, null};
 
     private AudioRouter audioRouter;
     private BluetoothManager bluetoothManager;
@@ -183,7 +206,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     static boolean sVoiceCapable = true;
 
     // Internal PhoneApp Call state tracker
-    CdmaPhoneCallState cdmaPhoneCallState;
+    CdmaPhoneCallState cdmaPhoneCallState[]={null, null};
 
     // The currently-active PUK entry activity and progress dialog.
     // Normally, these are the Emergency Dialer and the subsequent
@@ -245,6 +268,81 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     // Current TTY operating mode selected by user
     private int mPreferredTtyMode = Phone.TTY_MODE_OFF;
 
+    private IccCbChannelQueryHandler mIccCbChannelQueryHandler0;
+    private IccCbChannelQueryHandler mIccCbChannelQueryHandler1;
+
+    // CB database thread lock
+    private final Object mCbLock = new Object();
+    // _CB end
+
+    //videophone
+    /*package*/void setVTLoopbackflag(boolean Loopback) {
+        mIsVTLoopbackMode = Loopback;
+    }
+    
+    /*package*/boolean isVTLoopbackMode() {
+        return mIsVTLoopbackMode;
+    }
+    //videophone end
+
+    private static final String BCM_VM1PWR_SAVING_PATH = "gsm.vm1pwrsaving";
+    private static final String BCM_VM2PWR_SAVING_PATH = "gsm.vm2pwrsaving";
+    private static final String BCM_VM1PWR_SAVING_PRE_PATH = "gsm.vm1pwrsaving_pre";
+    private static final String BCM_VM2PWR_SAVING_PRE_PATH = "gsm.vm2pwrsaving_pre";
+
+
+    private final int BCM_EVENT_SIM_ABSENT = 0;
+    private final int BCM_EVENT_SIM_NETWORKLOCK = 1;
+    private final int BCM_EVENT_SIM_LOCK = 2;
+
+    Handler mSim1Handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            switch (msg.what) {
+            case BCM_EVENT_SIM_ABSENT:
+                // fall-through
+            case BCM_EVENT_SIM_NETWORKLOCK:
+                // fall-through
+            case BCM_EVENT_SIM_LOCK:
+                final boolean phone2On = (Settings.System.getInt(getContentResolver(), Settings.Global.PHONE2_ON, 1) != 0);
+                final boolean airplaneMode = (Settings.System.getInt(getContentResolver(),Settings.System.AIRPLANE_MODE_ON, 0) != 0);
+                if ((phone2On) && (!airplaneMode)) {
+                    phone[SimCardID.ID_ONE.toInt()].setRadioPowerOnNow();
+                }
+
+                break;
+            default:
+                break;
+
+            }
+        }
+    };
+
+    Handler mSim2Handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            switch (msg.what) {
+            case BCM_EVENT_SIM_ABSENT:
+                // fall-through
+            case BCM_EVENT_SIM_NETWORKLOCK:
+                // fall-through
+            case BCM_EVENT_SIM_LOCK:
+                final boolean phone1On = (Settings.System.getInt(getContentResolver(), Settings.Global.PHONE1_ON, 1)!=0);
+                final boolean airplaneMode = (Settings.System.getInt(getContentResolver(),Settings.System.AIRPLANE_MODE_ON, 0) != 0);
+                if ((phone1On) && (!airplaneMode)) {
+                    phone[SimCardID.ID_ZERO.toInt()].setRadioPowerOnNow();
+                }
+
+                break;
+            default:
+                break;
+
+            }
+        }
+    };
+
     /**
      * Set the restore mute state flag. Used when we are setting the mute state
      * OUTSIDE of user interaction {@link PhoneUtils#startNewCall(Phone)}
@@ -278,10 +376,41 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                         // Normal case: show the "SIM network unlock" PIN entry screen.
                         // The user won't be able to do anything else until
                         // they enter a valid SIM network PIN.
-                        Log.i(LOG_TAG, "show sim depersonal panel");
-                        IccNetworkDepersonalizationPanel ndpPanel =
-                                new IccNetworkDepersonalizationPanel(PhoneGlobals.getInstance());
-                        ndpPanel.show();
+                        Log.i(LOG_TAG, "show sim1 depersonal panel");
+                        final Intent intent = new Intent(Intent.ACTION_MAIN);
+                        intent.setClassName("com.android.phone",IccNetworkDepersonalizationPanel2.class.getName());
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        intent.putExtra("simId", SimCardID.ID_ZERO);
+                        mHandler.postDelayed(new Runnable() {
+                                public void run() {
+                                startActivity(intent);
+                            }
+                        }, 500);
+                    }
+                    break;
+                case EVENT_SIM2_NETWORK_LOCKED:
+                    if (getResources().getBoolean(R.bool.ignore_sim_network_locked_events)) {
+                        Log.i(LOG_TAG, "Ignoring EVENT_SIM2_NETWORK_LOCKED event; "
+                              + "not showing 'SIM network unlock' PIN entry screen");
+                    } else {
+                        Log.i(LOG_TAG, "show sim2 depersonal panel");
+                        /* The IccNetworkDepersonalizationPanel is a Dialog UI, not a Activity.
+                         * It has the potential bug: If user has a SIM PIN & SIM Lock(network Lock) SIM card.
+                         * After user unlocked the SIM PIN in the 1st PIN unlock UI, the SIM network
+                         * unlock UI will pop up, user will get the soft keyboard but can not input any text into
+                         * the password field.
+                         * We developed the new SIM network unlock UI(IccNetworkDepersonalizationPanel2)
+                         * base on Activity to resolve this issue. */
+                        final Intent intent = new Intent(Intent.ACTION_MAIN);
+                        intent.setClassName("com.android.phone",IccNetworkDepersonalizationPanel2.class.getName());
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        intent.putExtra("simId", SimCardID.ID_ONE);
+                        //startActivity(intent);
+                        mHandler.postDelayed(new Runnable() {
+                            public void run() {
+                                startActivity(intent);
+                            }
+                        }, 500);
                     }
                     break;
 
@@ -298,7 +427,8 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                     break;
 
                 case MMI_CANCEL:
-                    PhoneUtils.cancelMmiCode(phone);
+		    AsyncResult ar = (AsyncResult) msg.obj;
+                    PhoneUtils.cancelMmiCode((Phone) ar.userObj);
                     break;
 
                 case EVENT_SIM_STATE_CHANGED:
@@ -352,7 +482,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                     } else {
                         ttyMode = Phone.TTY_MODE_OFF;
                     }
-                    phone.setTTYMode(ttyMode, mHandler.obtainMessage(EVENT_TTY_MODE_SET));
+                    phone[SimCardID.ID_ZERO.toInt()].setTTYMode(ttyMode, mHandler.obtainMessage(EVENT_TTY_MODE_SET));
                     break;
 
                 case EVENT_TTY_MODE_GET:
@@ -361,6 +491,12 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
 
                 case EVENT_TTY_MODE_SET:
                     handleSetTTYModeResponse(msg);
+                    break;
+
+                /* To process GCF test case 27.16 - SIM ERROR */
+                case EVENT_UNSOL_OEM_HOOK_RAW:
+                    Log.d(LOG_TAG, "===> Received messahge:EVENT_UNSOL_OEM_HOOK_RAW");
+                    handleUnsolOEMHook(msg);
                     break;
             }
         }
@@ -376,6 +512,18 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
 
         ContentResolver resolver = getContentResolver();
 
+        String DefaultCALLSIM;
+        DefaultCALLSIM = SystemProperties.get(TelephonyProperties.PROPERTY_CALL_DEFAULT_SIM_ID,"");
+        if(DefaultCALLSIM.equals(""))
+        {
+            SystemProperties.set(TelephonyProperties.PROPERTY_CALL_DEFAULT_SIM_ID, String.valueOf(SimCardID.ID_PROMPT.toInt()));  
+        }
+                               
+        mIccCbChannelQueryHandler0 = new IccCbChannelQueryHandler(resolver, SimCardID.ID_ZERO.toInt());
+        if (PhoneUtils.isDualMode) {
+               mIccCbChannelQueryHandler1 = new IccCbChannelQueryHandler(resolver, SimCardID.ID_ONE.toInt());
+        }
+
         // Cache the "voice capable" flag.
         // This flag currently comes from a resource (which is
         // overrideable on a per-product basis):
@@ -386,19 +534,36 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         // sVoiceCapable =
         //   getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_VOICE_CALLS);
 
-        if (phone == null) {
+        if (phone[SimCardID.ID_ZERO.toInt()] == null && phone[SimCardID.ID_ONE.toInt()] == null) {
+               if (!PhoneUtils.isDualMode) {
+                   // In Single SIM version Phone App, set SIM2 power off to disable delayed power-on timer in GsmServiceStateTracker.java
+                   Settings.System.putInt(getContentResolver(), Settings.Global.PHONE2_ON, 0);
+               }
+
             // Initialize the telephony framework
-            PhoneFactory.makeDefaultPhones(this);
+            PhoneFactory.makeDefaultPhones(this, PhoneUtils.isDualMode);
 
             // Get the default phone
-            phone = PhoneFactory.getDefaultPhone();
+            phone[SimCardID.ID_ZERO.toInt()] = PhoneFactory.getDefaultPhone(SimCardID.ID_ZERO);
+            if (PhoneUtils.isDualMode) {
+               phone[SimCardID.ID_ONE.toInt()] = PhoneFactory.getDefaultPhone(SimCardID.ID_ONE);
+            }
 
             // Start TelephonyDebugService After the default phone is created.
             Intent intent = new Intent(this, TelephonyDebugService.class);
             startService(intent);
+ 
+            /* To process GCF test case 27.16 - SIM ERROR */
+            phone[SimCardID.ID_ZERO.toInt()].setOnUnsolOemHookRaw(mHandler,EVENT_UNSOL_OEM_HOOK_RAW,null);
+            if (PhoneUtils.isDualMode) {
+            	phone[SimCardID.ID_ONE.toInt()].setOnUnsolOemHookRaw(mHandler,EVENT_UNSOL_OEM_HOOK_RAW,null);
+            }
 
             mCM = CallManager.getInstance();
-            mCM.registerPhone(phone);
+            mCM.registerPhone(phone[SimCardID.ID_ZERO.toInt()]);
+            if (PhoneUtils.isDualMode) {
+            	mCM.registerPhone(phone[SimCardID.ID_ONE.toInt()]);
+            }
 
             // Create the NotificationMgr singleton, which is used to display
             // status bar icons and control other status bar behavior.
@@ -406,12 +571,24 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
 
             mHandler.sendEmptyMessage(EVENT_START_SIP_SERVICE);
 
-            int phoneType = phone.getPhoneType();
+            startService(new Intent(this, BrcmLoadIccContactsService.class));
+
+            int phoneType = phone[SimCardID.ID_ZERO.toInt()].getPhoneType();
 
             if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
                 // Create an instance of CdmaPhoneCallState and initialize it to IDLE
-                cdmaPhoneCallState = new CdmaPhoneCallState();
-                cdmaPhoneCallState.CdmaPhoneCallStateInit();
+                cdmaPhoneCallState[SimCardID.ID_ZERO.toInt()] = new CdmaPhoneCallState();
+                cdmaPhoneCallState[SimCardID.ID_ZERO.toInt()].CdmaPhoneCallStateInit();
+            }
+
+            if (PhoneUtils.isDualMode) {
+                   int phoneType2 = phone[SimCardID.ID_ONE.toInt()].getPhoneType();
+               
+                   if (phoneType2 == PhoneConstants.PHONE_TYPE_CDMA) {
+                       // Create an instance of CdmaPhoneCallState and initialize it to IDLE
+                       cdmaPhoneCallState[SimCardID.ID_ONE.toInt()] = new CdmaPhoneCallState();
+                       cdmaPhoneCallState[SimCardID.ID_ONE.toInt()].CdmaPhoneCallStateInit();
+                   }
             }
 
             if (BluetoothAdapter.getDefaultAdapter() != null) {
@@ -499,10 +676,31 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                     bluetoothManager, callModeler);
 
             // register for ICC status
-            IccCard sim = phone.getIccCard();
-            if (sim != null) {
+            // framework has to be notified on the status on "the other" ICC card in order to determine
+            // if it's okay to kill the power-on delay issued to improve the dual-sim camp on time
+            final IccCard sim = phone[SimCardID.ID_ZERO.toInt()].getIccCard();
+            final IccCard sim2;
+            if (PhoneUtils.isDualMode) {
+               sim2 = phone[SimCardID.ID_ONE.toInt()].getIccCard();
+            } else {
+               sim2 = null;
+            }
+
+            if (null != sim) {
                 if (VDBG) Log.v(LOG_TAG, "register for ICC status");
                 sim.registerForNetworkLocked(mHandler, EVENT_SIM_NETWORK_LOCKED, null);
+                if (PhoneUtils.isDualMode) {
+                       sim.registerForAbsent(mSim1Handler, BCM_EVENT_SIM_ABSENT, null);
+                       sim.registerForNetworkLocked(mSim1Handler, BCM_EVENT_SIM_NETWORKLOCK, null);
+                       sim.registerForLocked(mSim1Handler, BCM_EVENT_SIM_LOCK, null);
+                }
+            }
+            if (null != sim2) {
+                if (VDBG) Log.v(LOG_TAG, "register for ICC2 status");
+                sim2.registerForNetworkLocked(mHandler, EVENT_SIM_NETWORK_LOCKED, null);
+                sim2.registerForAbsent(mSim2Handler, BCM_EVENT_SIM_ABSENT, null);
+                sim2.registerForNetworkLocked(mSim2Handler, BCM_EVENT_SIM_NETWORKLOCK, null);
+                sim2.registerForLocked(mSim2Handler, BCM_EVENT_SIM_LOCK, null);
             }
 
             // register for MMI/USSD
@@ -527,6 +725,11 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                 intentFilter.addAction(TtyIntent.TTY_PREFERRED_MODE_CHANGE_ACTION);
             }
             intentFilter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
+            intentFilter.addAction(TelephonyIntents.ACTION_VT_CALL_FORWARD_CHANGED);
+
+            //  SIM_Dialog start
+            intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
+            //  SIM_Dialog end
             registerReceiver(mReceiver, intentFilter);
 
             // Use a separate receiver for ACTION_MEDIA_BUTTON broadcasts,
@@ -558,7 +761,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
             PhoneUtils.setAudioMode(mCM);
         }
 
-        if (TelephonyCapabilities.supportsOtasp(phone)) {
+	if (TelephonyCapabilities.supportsOtasp(phone[SimCardID.ID_ZERO.toInt()]) || (PhoneUtils.isDualMode && TelephonyCapabilities.supportsOtasp(phone[SimCardID.ID_ONE.toInt()]))) {
             cdmaOtaProvisionData = new OtaUtils.CdmaOtaProvisionData();
             cdmaOtaConfigData = new OtaUtils.CdmaOtaConfigData();
             cdmaOtaScreenState = new OtaUtils.CdmaOtaScreenState();
@@ -580,14 +783,14 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         // This way, there is a single owner (i.e AP) for the TTY setting in the phone.
         if (mTtyEnabled) {
             mPreferredTtyMode = android.provider.Settings.Secure.getInt(
-                    phone.getContext().getContentResolver(),
+                    phone[SimCardID.ID_ZERO.toInt()].getContext().getContentResolver(),
                     android.provider.Settings.Secure.PREFERRED_TTY_MODE,
                     Phone.TTY_MODE_OFF);
             mHandler.sendMessage(mHandler.obtainMessage(EVENT_TTY_PREFERRED_MODE_CHANGED, 0));
         }
         // Read HAC settings and configure audio hardware
         if (getResources().getBoolean(R.bool.hac_enabled)) {
-            int hac = android.provider.Settings.System.getInt(phone.getContext().getContentResolver(),
+            int hac = android.provider.Settings.System.getInt(phone[SimCardID.ID_ZERO.toInt()].getContext().getContentResolver(),
                                                               android.provider.Settings.System.HEARING_AID,
                                                               0);
             AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -618,8 +821,12 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     /**
      * Returns the Phone associated with this instance
      */
-    static Phone getPhone() {
-        return getInstance().phone;
+    static Phone getPhone(SimCardID simId) {
+       if (PhoneUtils.isDualMode) {
+               return getInstance().phone[simId.toInt()];
+       } else {
+               return getInstance().phone[SimCardID.ID_ZERO.toInt()];
+       }
     }
 
     Ringer getRinger() {
@@ -694,6 +901,18 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                 Uri.fromParts(Constants.SCHEME_SMSTO, number, null),
                 context, NotificationBroadcastReceiver.class);
         return PendingIntent.getBroadcast(context, 0, intent, 0);
+    }
+
+    /**
+     * @return current active phone name if the in-call UI is running activity(maybe background). 
+     */
+    SimCardID getCallScreenActiveSimCardId() {
+/* jw TODO once IncallUI is done
+        if (mInCallScreen == null) return SimCardID.ID_ZERO;
+
+        return mInCallScreen.getActiveSimCardId();
+*/
+	return SimCardID.ID_ZERO;
     }
 
     boolean isSimPinEnabled() {
@@ -881,7 +1100,8 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         // the screen to be on.
         //
         boolean isRinging = (state == PhoneConstants.State.RINGING);
-        boolean isDialing = (phone.getForegroundCall().getState() == Call.State.DIALING);
+	boolean isDialing = (phone[SimCardID.ID_ZERO.toInt()].getForegroundCall().getState() == Call.State.DIALING)
+                             || ((PhoneUtils.isDualMode)&&(phone[SimCardID.ID_ONE.toInt()].getForegroundCall().getState() == Call.State.DIALING));
         boolean keepScreenOn = isRinging || isDialing;
         // keepScreenOn == true means we'll hold a full wake lock:
         requestWakeState(keepScreenOn ? WakeState.FULL : WakeState.SLEEP);
@@ -939,16 +1159,18 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     private void onMMIComplete(AsyncResult r) {
         if (VDBG) Log.d(LOG_TAG, "onMMIComplete()...");
         MmiCode mmiCode = (MmiCode) r.result;
-        PhoneUtils.displayMMIComplete(phone, getInstance(), mmiCode, null, null);
+        PhoneUtils.displayMMIComplete((Phone) r.userObj, getInstance(), mmiCode, null, null);
     }
 
-    private void initForNewRadioTechnology() {
+    private void initForNewRadioTechnology(SimCardID simCardId) {
         if (DBG) Log.d(LOG_TAG, "initForNewRadioTechnology...");
+        Phone phone = this.phone[simCardId.toInt()];
+        CallNotifier notifier = this.notifier[simCardId.toInt()];
 
          if (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
             // Create an instance of CdmaPhoneCallState and initialize it to IDLE
-            cdmaPhoneCallState = new CdmaPhoneCallState();
-            cdmaPhoneCallState.CdmaPhoneCallStateInit();
+            cdmaPhoneCallState[simCardId.toInt()] = new CdmaPhoneCallState();
+            cdmaPhoneCallState[simCardId.toInt()].CdmaPhoneCallStateInit();
         }
         if (TelephonyCapabilities.supportsOtasp(phone)) {
             //create instances of CDMA OTA data classes
@@ -969,7 +1191,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
             clearOtaState();
         }
 
-        ringer.updateRingerContextAfterRadioTechnologyChange(this.phone);
+        ringer.updateRingerContextAfterRadioTechnologyChange(phone);
         notifier.updateCallNotifierRegistrationsAfterRadioTechnologyChange();
         callStateMonitor.updateAfterRadioTechnologyChange();
 
@@ -1013,20 +1235,28 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
-                boolean enabled = System.getInt(getContentResolver(),
+                final boolean enabled = System.getInt(getContentResolver(),
                         System.AIRPLANE_MODE_ON, 0) == 0;
-                phone.setRadioPower(enabled);
+                if (PhoneUtils.isDualMode && !enabled) {
+                    // Store previous VM power state in order to know which SIM to use for EC when airplane is turned on
+                    SystemProperties.set(BCM_VM1PWR_SAVING_PRE_PATH, SystemProperties.get(BCM_VM1PWR_SAVING_PATH, "0"));
+                    SystemProperties.set(BCM_VM2PWR_SAVING_PRE_PATH, SystemProperties.get(BCM_VM2PWR_SAVING_PATH, "0"));
+                }
+                phone[SimCardID.ID_ZERO.toInt()].setRadioPower(enabled);
+                if (PhoneUtils.isDualMode) {
+                       phone[SimCardID.ID_ONE.toInt()].setRadioPower(enabled);
+                }
             } else if (action.equals(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
                 if (VDBG) Log.d(LOG_TAG, "mReceiver: ACTION_ANY_DATA_CONNECTION_STATE_CHANGED");
                 if (VDBG) Log.d(LOG_TAG, "- state: " + intent.getStringExtra(PhoneConstants.STATE_KEY));
                 if (VDBG) Log.d(LOG_TAG, "- reason: "
                                 + intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY));
-
+		SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
                 // The "data disconnected due to roaming" notification is shown
                 // if (a) you have the "data roaming" feature turned off, and
                 // (b) you just lost data connectivity because you're roaming.
                 boolean disconnectedDueToRoaming =
-                        !phone.getDataRoamingEnabled()
+                        !phone[simCardId.toInt()].getDataRoamingEnabled()
                         && "DISCONNECTED".equals(intent.getStringExtra(PhoneConstants.STATE_KEY))
                         && Phone.REASON_ROAMING_ON.equals(
                             intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY));
@@ -1043,12 +1273,13 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                         intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE)));
             } else if (action.equals(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED)) {
                 String newPhone = intent.getStringExtra(PhoneConstants.PHONE_NAME_KEY);
+		SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
                 Log.d(LOG_TAG, "Radio technology switched. Now " + newPhone + " is active.");
-                initForNewRadioTechnology();
+                initForNewRadioTechnology(simCardId);
             } else if (action.equals(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED)) {
                 handleServiceStateChanged(intent);
             } else if (action.equals(TelephonyIntents.ACTION_EMERGENCY_CALLBACK_MODE_CHANGED)) {
-                if (TelephonyCapabilities.supportsEcm(phone)) {
+                if (TelephonyCapabilities.supportsEcm(phone[SimCardID.ID_ZERO.toInt()])) {
                     Log.d(LOG_TAG, "Emergency Callback Mode arrived in PhoneApp.");
                     // Start Emergency Callback Mode service
                     if (intent.getBooleanExtra("phoneinECMState", false)) {
@@ -1059,7 +1290,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                     // It doesn't make sense to get ACTION_EMERGENCY_CALLBACK_MODE_CHANGED
                     // on a device that doesn't support ECM in the first place.
                     Log.e(LOG_TAG, "Got ACTION_EMERGENCY_CALLBACK_MODE_CHANGED, "
-                          + "but ECM isn't supported for phone: " + phone.getPhoneName());
+                          + "but ECM isn't supported for phone: " + phone[SimCardID.ID_ZERO.toInt()].getPhoneName());
                 }
             } else if (action.equals(Intent.ACTION_DOCK_EVENT)) {
                 mDockState = intent.getIntExtra(Intent.EXTRA_DOCK_STATE,
@@ -1076,8 +1307,79 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                 int ringerMode = intent.getIntExtra(AudioManager.EXTRA_RINGER_MODE,
                         AudioManager.RINGER_MODE_NORMAL);
                 if (ringerMode == AudioManager.RINGER_MODE_SILENT) {
-                    notifier.silenceRinger();
+                    notifier[SimCardID.ID_ZERO.toInt()].silenceRinger();
+                    if (PhoneUtils.isDualMode) {
+                       notifier[SimCardID.ID_ONE.toInt()].silenceRinger();
+                    }
                 }
+            } else if (action.equals(TelephonyIntents.ACTION_VT_CALL_FORWARD_CHANGED)) {
+                if (VDBG) Log.d(LOG_TAG, "got VT_CALL_FORWARD_CHANGED");
+                boolean vtCfEnable = intent.getBooleanExtra("enable", false);
+                SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                if (VDBG) Log.d(LOG_TAG, "vf cf = "+ vtCfEnable + ", simId = " + simCardId.toInt());
+                notificationMgr.updateVTCfi(vtCfEnable, simCardId);
+            } else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
+                String iccState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                final int simId;
+                simId = simCardId.toInt();
+                if (VDBG) Log.d(LOG_TAG, "ACTION_SIM_STATE_CHANGED: " + iccState + ", simId = " + simId);
+                if (IccCardConstants.INTENT_VALUE_ICC_READY.equals(iccState)) {
+                    if (VDBG) Log.d(LOG_TAG,"IccCardConstants.INTENT_VALUE_ICC_READY" + ", simId = " + simId);
+
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+                    if (prefs.getBoolean(CallFeaturesSetting.BUTTON_CB_KEY, false) == false) {
+                    if (VDBG) Log.d(LOG_TAG, "cb disabled");
+                        return;
+                    }
+
+                    String chType = prefs.getString(CellBroadcastSettings.KEY_RECEIVE_CHANNEL_TYPE,
+                            "");
+
+                    if (chType.equals(CellBroadcastSettings.CHANNEL_TYPE_ALL)) {
+                        Log.d(LOG_TAG, "enabling all cb channels");
+                        CbSetAllChannelThread cbSetAllChannelThread= new CbSetAllChannelThread(simId, true);
+                        cbSetAllChannelThread.start();
+                    } else {
+                        Handler queryCB = new Handler();
+                        queryCB.postDelayed(new Runnable() {
+                            public void run() {
+                                if (VDBG) Log.d(LOG_TAG, "IccCard.INTENT_VALUE_ICC_READY: startQuery(), simId = " + simId);
+                                if ((PhoneUtils.isDualMode) && (simId == SimCardID.ID_ONE.toInt())) {
+                                    mIccCbChannelQueryHandler1.startQuery(0,
+                                            null,
+                                            CellBroadcastSettings.CB_CHANNELS_CONTENT_URI,
+                                            CellBroadcastSettings.PROJECTION,
+                                            "sim_id=" + simId + " AND channel_enabled=1",
+                                            null,
+                                            "channel_index DESC");
+                                } else {
+                                    mIccCbChannelQueryHandler0.startQuery(0,
+                                            null,
+                                            CellBroadcastSettings.CB_CHANNELS_CONTENT_URI,
+                                            CellBroadcastSettings.PROJECTION,
+                                            "sim_id=" + simId + " AND channel_enabled=1",
+                                            null,
+                                            "channel_index DESC");
+                                }
+                            }
+                        }, 1000);   
+                    }
+                }
+
+                // DUAL_SIM start
+                if (PhoneUtils.isDualMode) {
+                    // Checking new sim card status
+                    // mNewSimCardController.monitorSimCardState(intent);  // FixMe: temporarily disable this for CB integration.
+                }
+                // DUAL_SIM end
+
+            } else if (action.equals(Intent.ACTION_BOOT_COMPLETED) && PhoneUtils.isDualMode) {  //  SIM_Dialog
+                Log.d(LOG_TAG, "ACTION_BOOT_COMPLETED");
+                Intent simDialogIntent = new Intent(getApplicationContext(), BrcmSimDialogActivity.class);
+                simDialogIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                Log.d(LOG_TAG, "starting activity");
+                getApplicationContext().startActivity(simDialogIntent);
             }
         }
     }
@@ -1095,12 +1397,44 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         @Override
         public void onReceive(Context context, Intent intent) {
             KeyEvent event = (KeyEvent) intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+            Phone mActiveRingingPhone;
+            Call headsetcall=null;
+            final boolean hasRingingCall = mCM.hasActiveRingingCall();
+
+            if (hasRingingCall) {
+                Phone phone = mCM.getRingingPhone();
+                Call ringing = mCM.getFirstActiveRingingCall();
+                int phoneType = phone.getPhoneType();
+                if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
+                    if (VDBG) Log.d(LOG_TAG,"headset internalAnswerCall: answering (CDMA)...");
+                    // In CDMA this is simply a wrapper around PhoneUtils.answerCall().
+                    headsetcall=mCM.getFirstActiveRingingCall(); // Automatically holds the current active call,
+                    // if there is one
+                } else if ((phoneType == PhoneConstants.PHONE_TYPE_GSM)
+                           || (phoneType == PhoneConstants.PHONE_TYPE_SIP)) {
+                    // GSM: this is usually just a wrapper around
+                    // PhoneUtils.answerCall(), *but* we also need to do
+                    // something special for the "both lines in use" case.
+
+                    if (VDBG) Log.d(LOG_TAG,  "==> headset answer");
+                    headsetcall=mCM.getFirstActiveRingingCall();
+                } else {
+                    throw new IllegalStateException("Unexpected phone type: " + phoneType);
+                }
+            } else {
+                if (VDBG) Log.d(LOG_TAG, "===> headset hangup");
+                headsetcall =mCM.getActiveFgCall();
+            }
+
+            mActiveRingingPhone = headsetcall.getPhone();
+            if(VDBG) Log.d(LOG_TAG,  "===> headset mActiveRingingPhone SimCardId:" + mActiveRingingPhone.getSimCardId().toInt());
+
             if (VDBG) Log.d(LOG_TAG,
                            "MediaButtonBroadcastReceiver.onReceive()...  event = " + event);
             if ((event != null)
                 && (event.getKeyCode() == KeyEvent.KEYCODE_HEADSETHOOK)) {
                 if (VDBG) Log.d(LOG_TAG, "MediaButtonBroadcastReceiver: HEADSETHOOK");
-                boolean consumed = PhoneUtils.handleHeadsetHook(phone, event);
+		boolean consumed = PhoneUtils.handleHeadsetHook(mActiveRingingPhone, event);
                 if (VDBG) Log.d(LOG_TAG, "==> handleHeadsetHook(): consumed = " + consumed);
                 if (consumed) {
                     abortBroadcast();
@@ -1179,10 +1513,11 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
 
         // If service just returned, start sending out the queued messages
         ServiceState ss = ServiceState.newFromBundle(intent.getExtras());
+	SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
 
         if (ss != null) {
             int state = ss.getState();
-            notificationMgr.updateNetworkSelection(state);
+            notificationMgr.updateNetworkSelection(state, simCardId);
         }
     }
 
@@ -1260,7 +1595,7 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
                     "handleSetTTYModeResponse: Error setting TTY mode, ar.exception"
                     + ar.exception);
         }
-        phone.queryTTYMode(mHandler.obtainMessage(EVENT_TTY_MODE_GET));
+	phone[SimCardID.ID_ZERO.toInt()].queryTTYMode(mHandler.obtainMessage(EVENT_TTY_MODE_GET));
     }
 
     /**
@@ -1280,6 +1615,418 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
      * Used to determine if the preserved call origin is fresh enough.
      */
     private static final long CALL_ORIGIN_EXPIRATION_MILLIS = 30 * 1000;
+
+    /* To process GCF test case 27.16 - SIM ERROR */
+    private void handleUnsolOEMHook(Message msg) {
+        AsyncResult ar = (AsyncResult) msg.obj;  
+
+        if(ar.exception != null)
+        return;
+
+        byte[] rspRaw = (byte[])ar.result;
+
+        /*
+            Log.d(LOG_TAG, "===>rspRaw[0]:" + rspRaw[0]);
+            Log.d(LOG_TAG, "===>rspRaw[1]:" + rspRaw[1]);
+            Log.d(LOG_TAG, "===>rspRaw[2]:" + rspRaw[2]);
+            Log.d(LOG_TAG, "===>rspRaw[3]:" + rspRaw[3]);
+            Log.d(LOG_TAG, "===>rspRaw[4]:" + rspRaw[4]);
+            Log.d(LOG_TAG, "===>rspRaw[5]:" + rspRaw[5]);
+            */
+
+        if (new String(rspRaw).startsWith("BRCM")){
+            switch((int)rspRaw[4]){
+                case UNSOL_OEM_HOOK_RAW_Type.BRIL_HOOK_UNSOL_SIM_ERROR:
+                    Log.d(LOG_TAG, "===> handleUnsolOEMHook:Show the SIM Error toast");
+                    Toast.makeText(PhoneGlobals.this, "SIM ERROR!", Toast.LENGTH_LONG).show();
+                    break;
+            }    
+        }
+    }
+
+    private class IccCbChannelQueryHandler extends AsyncQueryHandler {
+        private int mSimId;
+        private String mIccCbChannelList;
+        private String mPhoneCbChannelList;
+        private int[] mPhoneChannelConfigValues;
+        private int mIccChannelListRetryCount;
+        
+        private static final int MSG_GET_ICC_CHANNEL_LIST = 100;
+        private static final int GET_ICC_CHANNEL_LIST_RETRY_TIME = 5000;
+        
+        public IccCbChannelQueryHandler(ContentResolver resolver, int simId) {
+            super(resolver);
+            mSimId = simId;
+            mIccChannelListRetryCount = 0;
+        }
+        
+        private boolean isIdenticalChannelList(String[] list1, String[] list2) {
+            if (list1.length != list2.length) {
+                return false;
+            }
+
+            if (1 == list1.length && 1 == list2.length
+                    && TextUtils.isEmpty(list1[0]) && list2[0].equals("-1")) {
+                // both lists are empty
+                return true;
+            }
+            
+            int len = list1.length;
+            boolean found;
+
+            for (int i=0;i<len;i++) {
+                if (TextUtils.isEmpty(list1[i]))
+                    return false;
+                found = false;
+                
+                for (int j=0;j<len;j++) {
+                    if (TextUtils.isEmpty(list2[j]))
+                        return false;
+                    
+                    if (list1[i].equals(list2[j])) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (!found)
+                    return false;
+            }
+            
+            return true;
+        }
+        
+        private void eraseAllEfCbmiChannels(String[] iccCbChArray) {
+            if (VDBG) Log.d(LOG_TAG,"=>eraseAllEfCbmiChannels()");
+            
+            int len = iccCbChArray.length;
+            int[] channelList = null;
+            
+            if (len > 0) {
+                channelList = new int[len];
+            }
+
+            if (null != channelList) {
+                for (int i=0;i<len;i++) {
+                    channelList[i] = -1;
+                    if (null != iccCbChArray[i]) {
+                        try {
+                            channelList[i] = Integer.parseInt(iccCbChArray[i]);
+                        } catch (NumberFormatException e) {
+                            Log.e(LOG_TAG, "eraseAllEfCbmiChannels(): iccCbChArray[" + i + "] = " + iccCbChArray[i]);
+                            channelList[i] = -1;
+                        }
+                    } else {
+                        Log.e(LOG_TAG, "eraseAllEfCbmiChannels(): iccCbChArray[" + i + "] == null");
+                    }
+                }
+                
+                CbEraseAllThread cbEraseAllThread= new CbEraseAllThread(mSimId, channelList);
+                cbEraseAllThread.start();
+            }
+
+            if (VDBG) Log.d(LOG_TAG,"eraseAllEfCbmiChannels()=>");
+        }
+        
+        private String getIccCbChannelList() {
+            String property;
+            String list;
+            
+            if(mSimId == SimCardID.ID_ONE.toInt()) {
+                property = TelephonyProperties.PROPERTY_ICC_CB_CHANNEL_LIST + "_" + String.valueOf(SimCardID.ID_ONE.toInt());
+            } else {
+                property = TelephonyProperties.PROPERTY_ICC_CB_CHANNEL_LIST;
+            }
+            list = SystemProperties.get(property, "");
+            mIccChannelListRetryCount++;
+            
+            return list;
+        }
+        
+        @Override
+        protected void onQueryComplete(int token, Object cookie, Cursor cursor) {
+            if (VDBG) Log.d(LOG_TAG,"=>onQueryComplete()");
+            
+            StringBuilder list = new StringBuilder("");
+            if (null != cursor) {
+                int channelCount = cursor.getCount();
+                int i = 0;
+
+                int arrayIndex = 0;
+                
+                if ((channelCount > 0) && (cursor.moveToFirst())) {
+                    String channelIndex;
+                    int cbChannelIndex;
+                    
+                    mPhoneChannelConfigValues = new int[channelCount];
+                    
+                    do {
+                        channelIndex = cursor.getString(2);
+                        list.append(channelIndex);
+                        
+                        if (i < (channelCount - 1))
+                            list.append(",");
+                        
+                        i++;
+                        
+                        try {
+                            cbChannelIndex = Integer.parseInt(channelIndex);
+                        } catch (NumberFormatException e) {
+                            Log.e(LOG_TAG, "Error Channel Index: " + channelIndex);
+                            cbChannelIndex = 0;
+                        }
+
+                        mPhoneChannelConfigValues[arrayIndex] = cbChannelIndex;
+                        
+                        arrayIndex++;
+                        
+                    } while (cursor.moveToNext());
+                }           
+                cursor.close();
+            }            
+            mPhoneCbChannelList = list.toString();
+            
+            
+            if (VDBG) Log.d(LOG_TAG,"onQueryComplete(): phoneCbChannelList = " + mPhoneCbChannelList);
+            
+            mIccCbChannelList = getIccCbChannelList();
+            if (!TextUtils.isEmpty(mIccCbChannelList)) {
+                handleIccCbChannelDifference();
+            } else {            
+                sendMessageDelayed(obtainMessage(MSG_GET_ICC_CHANNEL_LIST), GET_ICC_CHANNEL_LIST_RETRY_TIME);
+            }
+        }
+        
+        private void handleIccCbChannelDifference() {
+            if (VDBG) Log.d(LOG_TAG,"handleIccCbChannelDifference(): iccCbChannelList = " + mIccCbChannelList);
+            
+            String[] iccCbChArray = mIccCbChannelList.split(",");
+            String[] phoneCbChArray = mPhoneCbChannelList.split(",");
+            
+            if (!isIdenticalChannelList(phoneCbChArray, iccCbChArray)) {
+                if (VDBG) Log.d(LOG_TAG,"handleIccCbChannelDifference(): !isIdenticalChannelList()");
+                getContentResolver().delete(CellBroadcastSettings.CB_CHANNELS_CONTENT_URI,"sim_id="+mSimId, null);
+                
+                if (!mIccCbChannelList.equals("-1")) {
+                    eraseAllEfCbmiChannels(iccCbChArray);
+                }
+                //phone[mSimId].activateCellBroadcastSms(1, Message.obtain(this, CellBroadcastSettings.MESSAGE_ACTIVATE_CB_SMS));
+                
+                // set language index to default
+                CellBroadcastSettings.setCBLanguagePropertyValue(mSimId, CellBroadcastSettings.DEFAULT_LANGUAGE_INDEX);
+                
+                // disable receive cell broadcast
+                if (mSimId == SimCardID.ID_ONE.toInt())
+                    Settings.Secure.putInt(getContentResolver(),Settings.Global.SIM2_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+                else
+                    Settings.Secure.putInt(getContentResolver(),Settings.Global.SIM1_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_DISABLED);
+            } else {
+                if (VDBG) Log.d(LOG_TAG,"handleIccCbChannelDifference(): isIdenticalChannelList() == true");
+                int cbEnabled;
+                if (mSimId == SimCardID.ID_ONE.toInt())
+                    cbEnabled = Settings.Secure.getInt(getContentResolver(),Settings.Global.SIM2_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_ENABLED);
+                else
+                    cbEnabled = Settings.Secure.getInt(getContentResolver(),Settings.Global.SIM1_CELL_BROADCAST_ENABLE, RILConstants.GSM_CELL_BROADCAST_SMS_ENABLED);
+                
+                if (0 != cbEnabled) {
+                    if (null != mPhoneChannelConfigValues) {
+                        CbSetConfigThread cbSetConfigThread= new CbSetConfigThread(mSimId, true, mPhoneChannelConfigValues);
+                        cbSetConfigThread.start();
+                    } else {
+                        if (!mIccCbChannelList.equals("-1")) {
+                            eraseAllEfCbmiChannels(iccCbChArray);
+                        }
+                        //phone[mSimId].activateCellBroadcastSms(1, Message.obtain(this, CellBroadcastSettings.MESSAGE_ACTIVATE_CB_SMS));
+
+                        // set language index to default
+                        CellBroadcastSettings.setCBLanguagePropertyValue(mSimId, CellBroadcastSettings.DEFAULT_LANGUAGE_INDEX);
+                    }
+                } else {
+                    if (!mIccCbChannelList.equals("-1")) {
+                        eraseAllEfCbmiChannels(iccCbChArray);
+                    }
+                    //phone[mSimId].activateCellBroadcastSms(1, Message.obtain(this, CellBroadcastSettings.MESSAGE_ACTIVATE_CB_SMS));
+
+                    // set language index to default
+                    CellBroadcastSettings.setCBLanguagePropertyValue(mSimId, CellBroadcastSettings.DEFAULT_LANGUAGE_INDEX);
+                }
+
+                //set CB language to RIL
+                int initCbLangId = CellBroadcastSettings.getCBLanguagePropertyValue(mSimId);
+                if (CellBroadcastSettings.DEFAULT_LANGUAGE_INDEX != initCbLangId) {
+                    CbSetLanguageThread cbSetLanguageThread= new CbSetLanguageThread(mSimId, initCbLangId);
+                    cbSetLanguageThread.start();
+                }
+            }
+        }
+        
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+            case MSG_GET_ICC_CHANNEL_LIST:
+                if (VDBG) Log.d(LOG_TAG, "=>MSG_GET_ICC_CHANNEL_LIST: retry = " + mIccChannelListRetryCount);
+                mIccCbChannelList = getIccCbChannelList();
+                if (VDBG) Log.d(LOG_TAG, "MSG_GET_ICC_CHANNEL_LIST: getIccCbChannelList() = " + mIccCbChannelList);
+                if (!TextUtils.isEmpty(mIccCbChannelList)) {
+                    handleIccCbChannelDifference();
+                } else {
+                    if (mIccChannelListRetryCount < 50) {
+                        sendMessageDelayed(obtainMessage(MSG_GET_ICC_CHANNEL_LIST), GET_ICC_CHANNEL_LIST_RETRY_TIME);
+                    }
+                }
+                break;
+            default:
+                super.handleMessage(msg);
+                break;
+            }
+        }
+    }
+
+    private class CbEraseAllThread extends Thread {
+        private final int mSimId;
+        private int[] mChannelList;
+        public CbEraseAllThread(int simId, int[] channelList) {
+            super("CbEraseAllThread");
+            mSimId = simId;
+            if (null != channelList) {
+                mChannelList = new int[channelList.length];
+                java.lang.System.arraycopy(channelList, 0, mChannelList, 0, channelList.length);
+            } else {
+                mChannelList = null;
+            }
+        }
+
+        @Override
+        public void run() {
+            SmsManager smsManager;
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ONE);
+            } else {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ZERO);
+            }
+            if ((null != smsManager) && (null != mChannelList)) {
+                int len = mChannelList.length;
+                for(int i=0;i<len;i++) {
+                    if (0 <= mChannelList[i]) {
+                        //smsManager.enableCellBroadcast(mChannelList[i]);
+                        smsManager.disableCellBroadcast(mChannelList[i]);
+                    }
+                }
+            } else {
+                Log.e(LOG_TAG,"CbEraseAllThread.run(): smsManager = " + smsManager + ", mChannelList = " + mChannelList);
+            }
+        }
+    }
+
+    private class CbSetConfigThread extends Thread {
+        private final int mSimId;
+        private final boolean mEnable;
+        private int[] mChannelList;
+        public CbSetConfigThread(int simId, boolean enable, int[] channelList) {
+            super("CbSetConfigThread");
+            mSimId = simId;
+            mEnable = enable;
+            if (null != channelList) {
+                mChannelList = new int[channelList.length];
+                java.lang.System.arraycopy(channelList, 0, mChannelList, 0, channelList.length);
+            } else {
+                mChannelList = null;
+            }
+        }
+
+        @Override
+        public void run() {
+            SmsManager smsManager;
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ONE);
+            } else {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ZERO);
+            }
+            if ((null != smsManager) && (null != mChannelList)) {
+                int len = mChannelList.length;
+                synchronized(mCbLock) {
+                    for(int i = 0;i < len; i++) {
+                        if (mEnable) {
+                            if (0 <= mChannelList[i])
+                                smsManager.enableCellBroadcast(mChannelList[i]);
+                        } else {
+                            if (0 <= mChannelList[i])
+                                smsManager.disableCellBroadcast(mChannelList[i]);
+                        }
+                    }
+                }
+            } else {
+                Log.e(LOG_TAG,"CbSetConfigThread.run(): smsManager = " + smsManager +
+                        (mChannelList == null ? ", mChannelList = null" : ", mChannelList = " + Arrays.toString(mChannelList)));
+            }
+        }
+    }
+
+    private class CbSetAllChannelThread extends Thread {
+        private final int mSimId;
+        private final boolean mEnable;
+        public CbSetAllChannelThread(int simId, boolean enable) {
+            super("CbSetAllChannelThread");
+            mSimId = simId;
+            mEnable = enable;
+        }
+
+        @Override
+        public void run() {
+            SmsManager smsManager;
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ONE);
+            } else {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ZERO);
+            }
+            if (null != smsManager) {
+                boolean success;
+                synchronized(mCbLock) {
+                    if (mEnable) {
+                        success = smsManager.enableCellBroadcastRange(0, 999);
+                        Log.d(LOG_TAG, "CbSetConfigThread.run(): enable all channel result:"
+                                + success);
+                    } else {
+                        success = smsManager.disableCellBroadcastRange(0, 999);
+                        Log.d(LOG_TAG, "CbSetConfigThread.run(): disable all channel result:"
+                                + success);
+                    }
+                }
+            } else {
+                Log.e(LOG_TAG,"CbSetAllChannelThread.run(): smsManager = " + smsManager);
+            }
+        }
+    }
+
+    private class CbSetLanguageThread extends Thread {
+        private final int mSimId;
+        private int mNewLanguageIndex;
+        public CbSetLanguageThread(int simId, int newLanguageIndex) {
+            super("CbSetLanguageThread");
+            mSimId = simId;
+            mNewLanguageIndex = newLanguageIndex;
+        }
+
+        @Override
+        public void run() {
+            if (DBG) Log.d(LOG_TAG,"setCellBroadcastLanguage(): newIndex = " + mNewLanguageIndex);
+
+            SmsManager smsManager;
+            if (SimCardID.ID_ONE.toInt() == mSimId) {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ONE);
+            } else {
+                smsManager = SmsManager.getDefault(SimCardID.ID_ZERO);
+            }
+
+            boolean success;
+            synchronized(mCbLock) {
+                if (mNewLanguageIndex != CellBroadcastSettings.DEFAULT_LANGUAGE_INDEX) {
+                    success = smsManager.enableCellBroadcast(-1);   //-1 means to set langId
+                    if (DBG) Log.d(LOG_TAG, "enable langId result = " + success);
+                }
+            }
+        }
+    }
 
     /** Service connection */
     private final ServiceConnection mBluetoothPhoneConnection = new ServiceConnection() {

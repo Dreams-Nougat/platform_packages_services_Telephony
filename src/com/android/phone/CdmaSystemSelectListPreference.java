@@ -30,6 +30,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 public class CdmaSystemSelectListPreference extends ListPreference {
 
@@ -42,7 +43,7 @@ public class CdmaSystemSelectListPreference extends ListPreference {
     public CdmaSystemSelectListPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        mPhone = PhoneGlobals.getPhone();
+        mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         mHandler = new MyHandler();
         mPhone.queryCdmaRoamingPreference(
                 mHandler.obtainMessage(MyHandler.MESSAGE_GET_ROAMING_PREFERENCE));

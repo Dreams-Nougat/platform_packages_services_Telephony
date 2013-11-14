@@ -60,12 +60,15 @@ import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.cdma.CdmaConnection;
 import com.android.internal.telephony.sip.SipPhone;
 import com.android.phone.CallGatewayManager.RawGatewayInfo;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+
+import com.android.internal.app.AlertActivity;
 
 /**
  * Misc utilities for the Phone app.
@@ -135,6 +138,9 @@ public class PhoneUtils {
             ringing = ring;
         }
     }
+
+    public static final boolean isDualMode =
+        SystemProperties.getBoolean(TelephonyProperties.PROPERTY_DUAL_MODE_PHONE, false);
 
     /**
      * Handler that tracks the connections and updates the value of the
@@ -264,16 +270,15 @@ public class PhoneUtils {
     /* package */ static boolean answerCall(Call ringingCall) {
         log("answerCall(" + ringingCall + ")...");
         final PhoneGlobals app = PhoneGlobals.getInstance();
-        final CallNotifier notifier = app.notifier;
-
-        // If the ringer is currently ringing and/or vibrating, stop it
-        // right now (before actually answering the call.)
-        notifier.silenceRinger();
-
         final Phone phone = ringingCall.getPhone();
         final boolean phoneIsCdma = (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA);
         boolean answered = false;
         IBluetoothHeadsetPhone btPhone = null;
+        final CallNotifier notifier = app.notifier[phone.getSimCardId().toInt()];
+
+        // If the ringer is currently ringing and/or vibrating, stop it
+        // right now (before actually answering the call.)
+        notifier.silenceRinger();
 
         if (phoneIsCdma) {
             // Stop any signalInfo tone being played when a Call waiting gets answered
@@ -286,21 +291,21 @@ public class PhoneUtils {
             if (DBG) log("answerCall: call state = " + ringingCall.getState());
             try {
                 if (phoneIsCdma) {
-                    if (app.cdmaPhoneCallState.getCurrentCallState()
+                    if (app.cdmaPhoneCallState[phone.getSimCardId().toInt()].getCurrentCallState()
                             == CdmaPhoneCallState.PhoneCallState.IDLE) {
                         // This is the FIRST incoming call being answered.
                         // Set the Phone Call State to SINGLE_ACTIVE
-                        app.cdmaPhoneCallState.setCurrentCallState(
+                        app.cdmaPhoneCallState[phone.getSimCardId().toInt()].setCurrentCallState(
                                 CdmaPhoneCallState.PhoneCallState.SINGLE_ACTIVE);
                     } else {
                         // This is the CALL WAITING call being answered.
                         // Set the Phone Call State to CONF_CALL
-                        app.cdmaPhoneCallState.setCurrentCallState(
+                        app.cdmaPhoneCallState[phone.getSimCardId().toInt()].setCurrentCallState(
                                 CdmaPhoneCallState.PhoneCallState.CONF_CALL);
                         // Enable "Add Call" option after answering a Call Waiting as the user
                         // should be allowed to add another call in case one of the parties
                         // drops off
-                        app.cdmaPhoneCallState.setAddCallMenuStateAfterCallWaiting(true);
+                        app.cdmaPhoneCallState[phone.getSimCardId().toInt()].setAddCallMenuStateAfterCallWaiting(true);
 
                         // If a BluetoothPhoneService is valid we need to set the second call state
                         // so that the Bluetooth client can update the Call state correctly when
@@ -318,7 +323,7 @@ public class PhoneUtils {
 
                 final boolean isRealIncomingCall = isRealIncomingCall(ringingCall.getState());
 
-                //if (DBG) log("sPhone.acceptCall");
+                if (DBG) log("sPhone.acceptCall");
                 app.mCM.acceptCall(ringingCall);
                 answered = true;
 
@@ -351,8 +356,8 @@ public class PhoneUtils {
 
                 if (phoneIsCdma) {
                     // restore the cdmaPhoneCallState and btPhone.cdmaSetSecondCallState:
-                    app.cdmaPhoneCallState.setCurrentCallState(
-                            app.cdmaPhoneCallState.getPreviousCallState());
+                    app.cdmaPhoneCallState[phone.getSimCardId().toInt()].setCurrentCallState(
+                            app.cdmaPhoneCallState[phone.getSimCardId().toInt()].getPreviousCallState());
                     if (btPhone != null) {
                         try {
                             btPhone.cdmaSetSecondCallState(false);
@@ -405,6 +410,7 @@ public class PhoneUtils {
         Call ringing = cm.getFirstActiveRingingCall();
         Call fg = cm.getActiveFgCall();
         Call bg = cm.getFirstActiveBgCall();
+        PhoneGlobals app = PhoneGlobals.getInstance();
 
         if (!ringing.isIdle()) {
             log("hangup(): hanging up ringing call");
@@ -449,7 +455,7 @@ public class PhoneUtils {
                 // For Call waiting we DO NOT call the conventional hangup(call) function
                 // as in CDMA we just want to hangup the Call waiting connection.
                 log("hangupRingingCall(): CDMA-specific call-waiting hangup");
-                final CallNotifier notifier = PhoneGlobals.getInstance().notifier;
+                final CallNotifier notifier = PhoneGlobals.getInstance().notifier[ringing.getPhone().getSimCardId().toInt()];
                 notifier.sendCdmaCallWaitingReject();
                 return true;
             } else {
@@ -613,14 +619,14 @@ public class PhoneUtils {
      */
     private static void updateCdmaCallStateOnNewOutgoingCall(PhoneGlobals app,
             Connection connection) {
-        if (app.cdmaPhoneCallState.getCurrentCallState() ==
+        if (app.cdmaPhoneCallState[SimCardID.ID_ZERO.toInt()].getCurrentCallState() ==
             CdmaPhoneCallState.PhoneCallState.IDLE) {
             // This is the first outgoing call. Set the Phone Call State to ACTIVE
-            app.cdmaPhoneCallState.setCurrentCallState(
+            app.cdmaPhoneCallState[SimCardID.ID_ZERO.toInt()].setCurrentCallState(
                 CdmaPhoneCallState.PhoneCallState.SINGLE_ACTIVE);
         } else {
             // This is the second outgoing call. Set the Phone Call State to 3WAY
-            app.cdmaPhoneCallState.setCurrentCallState(
+            app.cdmaPhoneCallState[SimCardID.ID_ZERO.toInt()].setCurrentCallState(
                 CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE);
 
             app.getCallModeler().setCdmaOutgoing3WayCall(connection);
@@ -660,6 +666,12 @@ public class PhoneUtils {
      */
     public static int placeCall(Context context, Phone phone, String number, Uri contactRef,
             boolean isEmergencyCall, RawGatewayInfo gatewayInfo, CallGatewayManager callGateway) {
+        return placeCall(context, phone, number, contactRef, isEmergencyCall, gatewayInfo, callGateway, false);
+    }
+
+
+    public static int placeCall(Context context, Phone phone, String number, Uri contactRef,
+            boolean isEmergencyCall, RawGatewayInfo gatewayInfo, CallGatewayManager callGateway, boolean makeVTCall) {
         final Uri gatewayUri = gatewayInfo.gatewayUri;
 
         if (VDBG) {
@@ -903,10 +915,10 @@ public class PhoneUtils {
         if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
             log("mergeCalls(): CDMA...");
             PhoneGlobals app = PhoneGlobals.getInstance();
-            if (app.cdmaPhoneCallState.getCurrentCallState()
+            if (app.cdmaPhoneCallState[cm.getFgPhone().getSimCardId().toInt()].getCurrentCallState()
                     == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE) {
                 // Set the Phone Call State to conference
-                app.cdmaPhoneCallState.setCurrentCallState(
+                app.cdmaPhoneCallState[cm.getFgPhone().getSimCardId().toInt()].setCurrentCallState(
                         CdmaPhoneCallState.PhoneCallState.CONF_CALL);
 
                 // Send flash cmd
@@ -1177,7 +1189,7 @@ public class PhoneUtils {
                     };
 
                 // build the dialog
-                final AlertDialog newDialog = new AlertDialog.Builder(context)
+                /* final AlertDialog newDialog = new AlertDialog.Builder(context)
                         .setMessage(text)
                         .setView(dialogView)
                         .setPositiveButton(R.string.send_button, mUSSDDialogListener)
@@ -1194,7 +1206,8 @@ public class PhoneUtils {
                                 case KeyEvent.KEYCODE_CALL:
                                 case KeyEvent.KEYCODE_ENTER:
                                     if(event.getAction() == KeyEvent.ACTION_DOWN) {
-                                        phone.sendUssdResponse(inputText.getText().toString());
+                                        if (null != phone)
+                                            phone.sendUssdResponse(inputText.getText().toString());
                                         newDialog.dismiss();
                                     }
                                     return true;
@@ -1212,7 +1225,15 @@ public class PhoneUtils {
                         WindowManager.LayoutParams.FLAG_DIM_BEHIND);
 
                 // now show the dialog!
-                newDialog.show();
+                newDialog.show(); */
+
+                final Intent dialogIntent = new Intent(Intent.ACTION_MAIN);
+                dialogIntent.setClassName("com.android.phone",MMIAlertActivity.class.getName());
+                dialogIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if(phone != null)
+                    dialogIntent.putExtra("simId", phone.getSimCardId().toInt());
+                dialogIntent.putExtra("mmiMessage", text);
+                context.startActivity(dialogIntent);
             }
         }
     }
@@ -1368,6 +1389,10 @@ public class PhoneUtils {
      * asynchronous startGetCallerInfo API.
      */
     static CallerInfo getCallerInfo(Context context, Connection c) {
+        return getCallerInfo(context, c, SimCardID.ID_ZERO);
+    }
+
+    static CallerInfo getCallerInfo(Context context, Connection c, SimCardID simCardId) {
         CallerInfo info = null;
 
         if (c != null) {
@@ -1396,7 +1421,7 @@ public class PhoneUtils {
                     if (DBG) log("getCallerInfo: number = " + toLogSafePhoneNumber(number));
 
                     if (!TextUtils.isEmpty(number)) {
-                        info = CallerInfo.getCallerInfo(context, number);
+                        info = CallerInfo.getCallerInfo(context, number, simCardId);
                         if (info != null) {
                             c.setUserData(info);
                         }
@@ -1815,10 +1840,10 @@ public class PhoneUtils {
         final PhoneGlobals app = PhoneGlobals.getInstance();
         int phoneType = call.getPhone().getPhoneType();
         if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
-            CdmaPhoneCallState.PhoneCallState state = app.cdmaPhoneCallState.getCurrentCallState();
+            CdmaPhoneCallState.PhoneCallState state = app.cdmaPhoneCallState[call.getPhone().getSimCardId().toInt()].getCurrentCallState();
             if ((state == CdmaPhoneCallState.PhoneCallState.CONF_CALL)
                     || ((state == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE)
-                    && !app.cdmaPhoneCallState.IsThreeWayCallOrigStateDialing())) {
+                    && !app.cdmaPhoneCallState[call.getPhone().getSimCardId().toInt()].IsThreeWayCallOrigStateDialing())) {
                 return true;
             }
         } else {
@@ -2178,7 +2203,7 @@ public class PhoneUtils {
                 Connection c = phone.getForegroundCall().getLatestConnection();
                 // If it is NOT an emg #, toggle the mute state. Otherwise, ignore the hook.
                 if (c != null && !PhoneNumberUtils.isLocalEmergencyNumber(c.getAddress(),
-                                                                          PhoneGlobals.getInstance())) {
+                                                                          PhoneGlobals.getInstance(), phone.getSimCardId())) {
                     if (getMute()) {
                         if (DBG) log("handleHeadsetHook: UNmuting...");
                         setMute(false);
@@ -2295,7 +2320,7 @@ public class PhoneUtils {
             // CDMA: "Swap" is enabled only when the phone reaches a *generic*.
             // state by either accepting a Call Waiting or by merging two calls
             PhoneGlobals app = PhoneGlobals.getInstance();
-            return (app.cdmaPhoneCallState.getCurrentCallState()
+            return (app.cdmaPhoneCallState[cm.getDefaultPhone().getSimCardId().toInt()].getCurrentCallState()
                     == CdmaPhoneCallState.PhoneCallState.CONF_CALL);
         } else if ((phoneType == PhoneConstants.PHONE_TYPE_GSM)
                 || (phoneType == PhoneConstants.PHONE_TYPE_SIP)) {
@@ -2321,9 +2346,9 @@ public class PhoneUtils {
         if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
             // CDMA: "Merge" is enabled only when the user is in a 3Way call.
             PhoneGlobals app = PhoneGlobals.getInstance();
-            return ((app.cdmaPhoneCallState.getCurrentCallState()
+            return ((app.cdmaPhoneCallState[cm.getFgPhone().getSimCardId().toInt()].getCurrentCallState()
                     == CdmaPhoneCallState.PhoneCallState.THRWAY_ACTIVE)
-                    && !app.cdmaPhoneCallState.IsThreeWayCallOrigStateDialing());
+                    && !app.cdmaPhoneCallState[cm.getFgPhone().getSimCardId().toInt()].IsThreeWayCallOrigStateDialing());
         } else {
             // GSM: "Merge" is available if both lines are in use and there's no
             // incoming call, *and* the current conference isn't already
@@ -2355,7 +2380,7 @@ public class PhoneUtils {
            // - After 30 seconds of user Ignoring/Missing a Call Waiting call.
             PhoneGlobals app = PhoneGlobals.getInstance();
             return ((fgCallState == Call.State.ACTIVE)
-                    && (app.cdmaPhoneCallState.getAddCallMenuStateAfterCallWaiting()));
+                    && (app.cdmaPhoneCallState[phone.getSimCardId().toInt()].getAddCallMenuStateAfterCallWaiting()));
         } else if ((phoneType == PhoneConstants.PHONE_TYPE_GSM)
                 || (phoneType == PhoneConstants.PHONE_TYPE_SIP)) {
             // GSM: "Add call" is available only if ALL of the following are true:
@@ -2562,6 +2587,32 @@ public class PhoneUtils {
         return cm.getDefaultPhone();
     }
 
+    /** dual sim
+     * Returns the most appropriate Phone object to handle a call
+     * to the specified number.
+     *
+     * @param cm the CallManager.
+     * @param scheme the scheme from the data URI that the number originally came from.
+     * @param number the phone number, or SIP address.
+     */
+    public static Phone pickPhoneBasedOnNumber(CallManager cm,
+            String scheme, String number, String primarySipUri, SimCardID simId) {
+        if (DBG) {
+            log("pickPhoneBasedOnNumber: scheme " + scheme
+                    + ", number " + toLogSafePhoneNumber(number)
+                    + ", sipUri "
+                    + (primarySipUri != null ? Uri.parse(primarySipUri).toSafeString() : "null")
+                    + ", SIM ID " + simId.toInt());
+        }
+
+        if (primarySipUri != null) {
+            Phone phone = getSipPhoneFromUri(cm, primarySipUri);
+            if (phone != null) return phone;
+        }
+        return cm.getDefaultPhone(simId);
+    }
+
+
     public static Phone getSipPhoneFromUri(CallManager cm, String target) {
         for (Phone phone : cm.getAllPhones()) {
             if (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_SIP) {
@@ -2674,9 +2725,9 @@ public class PhoneUtils {
 
         // On CDMA phones, dump out the CdmaPhoneCallState too:
         if (phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
-            if (app.cdmaPhoneCallState != null) {
+            if (app.cdmaPhoneCallState[phone.getSimCardId().toInt()] != null) {
                 Log.d(LOG_TAG, "  - CDMA call state: "
-                      + app.cdmaPhoneCallState.getCurrentCallState());
+                      + app.cdmaPhoneCallState[phone.getSimCardId().toInt()].getCurrentCallState());
             } else {
                 Log.d(LOG_TAG, "  - CDMA device, but null cdmaPhoneCallState!");
             }

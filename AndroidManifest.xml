@@ -84,7 +84,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.PERFORM_CDMA_PROVISIONING" />
     <uses-permission android:name="android.permission.USE_SIP" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.REBOOT" />
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
     <uses-permission android:name="android.permission.UPDATE_LOCK" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
     <uses-permission android:name="com.android.smspush.WAPPUSH_MANAGER_BIND" />
@@ -92,6 +96,11 @@
     <uses-permission android:name="android.permission.UPDATE_APP_OPS_STATS" />
     <uses-permission android:name="android.permission.CONNECTIVITY_INTERNAL" />
     <uses-permission android:name="android.permission.SET_PREFERRED_APPLICATIONS" />
+
+<!-- videophone -->
+    <uses-permission android:name="android.permission.CAMERA"></uses-permission>
+    <uses-permission android:name="android.permission.ACCESS_SURFACE_FLINGER"></uses-permission>
+<!-- end videophone -->
 
     <!-- This tells the activity manager to not delay any of our activity
          start requests, even if they happen immediately after the user
@@ -107,6 +116,11 @@
                       android:authorities="icc"
                       android:multiprocess="true"
                       android:exported="true"
+                      android:readPermission="android.permission.READ_CONTACTS"
+                      android:writePermission="android.permission.WRITE_CONTACTS" />
+            <provider android:name="IccProvider"
+                      android:authorities="icc2"
+                      android:multiprocess="true"
                       android:readPermission="android.permission.READ_CONTACTS"
                       android:writePermission="android.permission.WRITE_CONTACTS" />
 
@@ -259,6 +273,26 @@
             </intent-filter>
         </activity>
 
+        <!-- SIM Network unlock UI base on activity -->
+        <activity android:name="IccNetworkDepersonalizationPanel2"
+            android:label="@string/label_ndp"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+
+        <!-- MMI message UI base on AlertActivity -->
+        <activity android:name="MMIAlertActivity"
+            android:label="@string/mmiResponse_PENDING"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+
         <!-- "Mobile network settings" screen, used on both
              non-voice-capable tablets and regular phone devices. -->
         <activity android:name="MobileNetworkSettings"
@@ -279,12 +313,16 @@
         <!-- service to handle network query requests sent to RIL -->
         <service android:name="NetworkQueryService" />
 
+        <!-- service to handle network query requests sent to RIL -->
+        <service android:name="NetworkQueryService2" />
+
         <!-- clearing of missed call notifications  -->
         <service android:name="ClearMissedCallsService" />
 
+	<!-- BRCM add mcc and mnc to configChanges for SIM hot swap -->
         <activity android:name="NetworkSetting"
                 android:label="@string/networks"
-                android:configChanges="orientation|screenSize|keyboardHidden"
+		android:configChanges="mcc|mnc|orientation|screenSize|keyboardHidden"
                 android:theme="@android:style/Theme.Holo.DialogWhenLarge">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -346,6 +384,13 @@
         <activity android:name="CellBroadcastSms"
             android:label="@string/cell_broadcast_sms"
             android:theme="@android:style/Theme.Holo.DialogWhenLarge">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name="CellBroadcastSettings"
+            android:label="@string/cell_broadcast_title">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
@@ -530,6 +575,120 @@
                 android:theme="@style/Empty"
                 android:exported="false">
         </activity>
+
+<!-- add for VideoPhone -->
+        <activity android:name="VTOutgoingCallBroadcaster"
+                android:permission="android.permission.CALL_PHONE"
+                android:label="@string/title"
+                android:theme="@android:style/Theme.NoDisplay"
+                android:configChanges="orientation|keyboardHidden">
+                
+            <!-- CALL action intent filters, for the various ways
+                 of initiating an outgoing call. -->
+            <intent-filter>
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter android:icon="@drawable/ic_launcher_sip_call">
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sip" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="voicemail" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="vnd.android.cursor.item/phone" />
+                <data android:mimeType="vnd.android.cursor.item/phone_v2" />
+                <data android:mimeType="vnd.android.cursor.item/person" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name="VoiceOutgoingCallBroadcaster"
+                android:permission="android.permission.CALL_PHONE"
+                android:label="@string/titleVoice"
+                android:theme="@android:style/Theme.NoDisplay"
+                android:configChanges="orientation|keyboardHidden">
+                
+            <!-- CALL action intent filters, for the various ways
+                 of initiating an outgoing call. -->
+            <intent-filter>
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter android:icon="@drawable/ic_launcher_sip_call">
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sip" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="voicemail" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.android.phone.action.ACTION_VT_VOICE_CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="vnd.android.cursor.item/phone" />
+                <data android:mimeType="vnd.android.cursor.item/phone_v2" />
+                <data android:mimeType="vnd.android.cursor.item/person" />
+            </intent-filter>
+        </activity>        
+<!-- end for VideoPhone  --> 
+
+        <!-- BRCM SIM_NAME start -->
+        <activity android:name="EditSimNamePreference" android:label="@string/sim_name_setting_title">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+        <!-- BRCM SIM_NAME end -->
+
+        <!-- service to load Icc Contacts from IccProvider and add IccContacts to ContactsProvider -->
+        <service android:name="BrcmLoadIccContactsService" />
+
+        <!-- Call Barring Setting -->
+        <activity android:name="CallBarringSetting" android:label="@string/call_barring_settings">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+
+        <!-- The authenticator service -->
+        <service
+            android:name="SimContactAccountAuthenticationService"
+            android:exported="true">
+            <intent-filter>
+                <action
+                    android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+        <service
+            android:name="SimContactsSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action
+                    android:name="android.content.SyncAdapter" />
+            </intent-filter>
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/syncadapter" />
+        </service>
+        <activity android:name="BrcmSimDialogActivity"
+                  android:configChanges="mcc|mnc|orientation|screenSize|keyboardHidden"
+                  android:theme="@android:style/Theme.Translucent.NoTitleBar"
+                  android:taskAffinity=":BrcmSimDialogActivity">
+        </activity>
+
 
         <receiver android:name="CallerInfoCacheUpdateReceiver">
             <intent-filter>

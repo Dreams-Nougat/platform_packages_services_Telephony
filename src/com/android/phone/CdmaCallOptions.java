@@ -30,6 +30,8 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceScreen;
 import android.util.Log;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+
 public class CdmaCallOptions extends PreferenceActivity {
     private static final String LOG_TAG = "CdmaCallOptions";
     private final boolean DBG = (PhoneGlobals.DBG_LEVEL >= 2);
@@ -44,7 +46,7 @@ public class CdmaCallOptions extends PreferenceActivity {
         addPreferencesFromResource(R.xml.cdma_call_privacy);
 
         mButtonVoicePrivacy = (CheckBoxPreference) findPreference(BUTTON_VP_KEY);
-        if (PhoneGlobals.getPhone().getPhoneType() != PhoneConstants.PHONE_TYPE_CDMA
+        if (PhoneGlobals.getPhone(SimCardID.ID_ZERO).getPhoneType() != PhoneConstants.PHONE_TYPE_CDMA
                 || getResources().getBoolean(R.bool.config_voice_privacy_disable)) {
             //disable the entire screen
             getPreferenceScreen().setEnabled(false);

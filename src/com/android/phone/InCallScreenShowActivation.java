@@ -29,6 +29,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyCapabilities;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * Invisible activity that handles the com.android.phone.PERFORM_CDMA_PROVISIONING intent.
@@ -61,7 +62,7 @@ public class InCallScreenShowActivation extends Activity {
         }
 
         PhoneGlobals app = PhoneGlobals.getInstance();
-        Phone phone = app.getPhone();
+        Phone phone = app.getPhone(SimCardID.ID_ZERO);
         if (!TelephonyCapabilities.supportsOtasp(phone)) {
             Log.w(LOG_TAG, "CDMA Provisioning not supported on this device");
             setResult(RESULT_CANCELED);

@@ -36,6 +36,7 @@ import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.ServiceState;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -44,6 +45,11 @@ import android.widget.ProgressBar;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.TelephonyCapabilities;
+
+/* dual sim */
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyProperties;
+// import com.rv.videophone.*; //TODO: JB_DISABLE_VT
 
 /**
  * OutgoingCallBroadcaster receives CALL and CALL_PRIVILEGED Intents, and
@@ -93,6 +99,11 @@ public class OutgoingCallBroadcaster extends Activity
 
     // Dialog IDs
     private static final int DIALOG_NOT_VOICE_CAPABLE = 1;
+
+    //Preferred dial selection items
+    private static final int PREFERRED_DIAL_NONE = 0;
+    private static final int PREFERRED_DIAL_VOICE = 1;
+    private static final int PREFERRED_DIAL_VIDEO = 2;
 
     /** Note message codes < 100 are reserved for the PhoneApp. */
     private static final int EVENT_OUTGOING_CALL_TIMEOUT = 101;
@@ -183,13 +194,32 @@ public class OutgoingCallBroadcaster extends Activity
             if (VDBG) Log.v(TAG, "- got number from resultData: '" + number + "'");
 
             final PhoneGlobals app = PhoneGlobals.getInstance();
+            SimCardID simCardId;
+            if (PhoneUtils.isDualMode) {
+                int defSimCardId = app.phoneMgr[SimCardID.ID_ZERO.toInt()].getDefaultSimForVoiceCalls();
+                if( defSimCardId < SimCardID.ID_ZERO.toInt()) {
+                    defSimCardId = SimCardID.ID_ZERO.toInt();
+                }
+                if (!intent.hasExtra("simId")) {
+                    if (!PhoneNumberUtils.isLocalEmergencyNumber(number, context, (SimCardID.ID_ZERO.toInt() == defSimCardId)?SimCardID.ID_ZERO:SimCardID.ID_ONE)) {
+                        if (defSimCardId == SimCardID.ID_ONE.toInt() && app.phone[SimCardID.ID_ONE.toInt()].getServiceState().getState() != ServiceState.STATE_IN_SERVICE && app.phone[SimCardID.ID_ZERO.toInt()].getServiceState().getState() == ServiceState.STATE_IN_SERVICE) {
+                            defSimCardId = SimCardID.ID_ZERO.toInt();
+                        } else if (defSimCardId == SimCardID.ID_ZERO.toInt() && app.phone[SimCardID.ID_ZERO.toInt()].getServiceState().getState() != ServiceState.STATE_IN_SERVICE && app.phone[SimCardID.ID_ONE.toInt()].getServiceState().getState() == ServiceState.STATE_IN_SERVICE) {
+                            defSimCardId = SimCardID.ID_ONE.toInt();
+                        }
+                    }
+                }
+                simCardId = (SimCardID)(intent.getExtra("simId", (SimCardID.ID_ZERO.toInt() == defSimCardId)?SimCardID.ID_ZERO:SimCardID.ID_ONE));
+            } else {
+                simCardId = SimCardID.ID_ZERO;
+            }
 
             // OTASP-specific checks.
             // TODO: This should probably all happen in
             // OutgoingCallBroadcaster.onCreate(), since there's no reason to
             // even bother with the NEW_OUTGOING_CALL broadcast if we're going
             // to disallow the outgoing call anyway...
-            if (TelephonyCapabilities.supportsOtasp(app.phone)) {
+            if (TelephonyCapabilities.supportsOtasp(app.phone[simCardId.toInt()])) {
                 boolean activateState = (app.cdmaOtaScreenState.otaScreenState
                         == OtaUtils.CdmaOtaScreenState.OtaScreenState.OTA_STATUS_ACTIVATION);
                 boolean dialogState = (app.cdmaOtaScreenState.otaScreenState
@@ -228,12 +258,12 @@ public class OutgoingCallBroadcaster extends Activity
             if (number == null) {
                 if (DBG) Log.v(TAG, "CALL cancelled (null number), returning...");
                 return false;
-            } else if (TelephonyCapabilities.supportsOtasp(app.phone)
-                    && (app.phone.getState() != PhoneConstants.State.IDLE)
-                    && (app.phone.isOtaSpNumber(number))) {
+            } else if (TelephonyCapabilities.supportsOtasp(app.phone[simCardId.toInt()])
+                    && (app.phone[simCardId.toInt()].getState() != PhoneConstants.State.IDLE)
+                    && (app.phone[simCardId.toInt()].isOtaSpNumber(number))) {
                 if (DBG) Log.v(TAG, "Call is active, a 2nd OTA call cancelled -- returning.");
                 return false;
-            } else if (PhoneNumberUtils.isPotentialLocalEmergencyNumber(number, context)) {
+            } else if (PhoneNumberUtils.isPotentialLocalEmergencyNumber(number, context, simCardId)) {
                 // Just like 3rd-party apps aren't allowed to place emergency
                 // calls via the ACTION_CALL intent, we also don't allow 3rd
                 // party apps to use the NEW_OUTGOING_CALL broadcast to rewrite
@@ -249,6 +279,8 @@ public class OutgoingCallBroadcaster extends Activity
                 return false;
             }
 
+	    if (DBG) Log.v(TAG, "Phone id : " + simCardId + " CALL to " + number + " proceeding.");
+
             Uri uri = Uri.parse(originalUri);
 
             // We already called convertKeypadLettersToDigits() and
@@ -263,7 +295,7 @@ public class OutgoingCallBroadcaster extends Activity
             if (VDBG) Log.v(TAG, "- uri: " + uri);
             if (VDBG) Log.v(TAG, "- actual number to dial: '" + number + "'");
 
-            startSipCallOptionHandler(context, intent, uri, number);
+            startSipCallOptionHandler(context, intent, uri, number, simCardId);
 
             return true;
         }
@@ -301,7 +333,7 @@ public class OutgoingCallBroadcaster extends Activity
      *   raw SIP address (like "user@example.com").
      */
     private void startSipCallOptionHandler(Context context, Intent intent,
-            Uri uri, String number) {
+            Uri uri, String number, SimCardID simCardId) {
         if (VDBG) {
             Log.i(TAG, "startSipCallOptionHandler...");
             Log.i(TAG, "- intent: " + intent);
@@ -315,6 +347,7 @@ public class OutgoingCallBroadcaster extends Activity
 
         Intent newIntent = new Intent(Intent.ACTION_CALL, uri);
         newIntent.putExtra(EXTRA_ACTUAL_NUMBER_TO_DIAL, number);
+	newIntent.putExtra("simId", simCardId); //dual sim
         CallGatewayManager.checkAndCopyPhoneProviderExtras(intent, newIntent);
 
         // Finally, launch the SipCallOptionHandler, with the copy of the
@@ -467,6 +500,90 @@ public class OutgoingCallBroadcaster extends Activity
             return;
         }
 
+        final PhoneGlobals app = PhoneGlobals.getInstance();
+        SimCardID simCardId;
+        if (PhoneUtils.isDualMode) {
+            int defSimCardId = app.phoneMgr[SimCardID.ID_ZERO.toInt()].getDefaultSimForVoiceCalls();
+            if( defSimCardId < SimCardID.ID_ZERO.toInt()) {
+                defSimCardId = SimCardID.ID_ZERO.toInt();
+            }
+            if (!intent.hasExtra("simId")) {
+                if (!PhoneNumberUtils.isLocalEmergencyNumber(number, this, (SimCardID.ID_ZERO.toInt() == defSimCardId)?SimCardID.ID_ZERO:SimCardID.ID_ONE)) {
+                    if (defSimCardId == SimCardID.ID_ONE.toInt() && app.phone[SimCardID.ID_ONE.toInt()].getServiceState().getState() != ServiceState.STATE_IN_SERVICE && app.phone[SimCardID.ID_ZERO.toInt()].getServiceState().getState() == ServiceState.STATE_IN_SERVICE) {
+                        defSimCardId = SimCardID.ID_ZERO.toInt();
+                    } else if (defSimCardId == SimCardID.ID_ZERO.toInt() && app.phone[SimCardID.ID_ZERO.toInt()].getServiceState().getState() != ServiceState.STATE_IN_SERVICE && app.phone[SimCardID.ID_ONE.toInt()].getServiceState().getState() == ServiceState.STATE_IN_SERVICE) {
+                        defSimCardId = SimCardID.ID_ONE.toInt();
+                   }
+               }
+            }
+            simCardId = (SimCardID)(intent.getExtra("simId", (SimCardID.ID_ZERO.toInt() == defSimCardId)?SimCardID.ID_ZERO:SimCardID.ID_ONE));
+        } else {
+            simCardId = SimCardID.ID_ZERO;
+        }
+
+        if(DBG){
+            if (intent.hasExtra("simId"))
+                Log.d(TAG,"intent has simId, simCardId:" + simCardId.toInt());
+            else
+                Log.d(TAG,"intent has NO simId");
+        }
+
+        /*videophone start*/
+        final boolean isEmergencyNumber =
+                (number != null) && PhoneNumberUtils.isLocalEmergencyNumber(number, this, simCardId);
+
+        String propertyNetworkType;
+        if (SimCardID.ID_ONE == simCardId) {
+            propertyNetworkType = TelephonyProperties.PROPERTY_DATA_NETWORK_TYPE + "_" + String.valueOf(SimCardID.ID_ONE.toInt());
+        } else {
+            propertyNetworkType = TelephonyProperties.PROPERTY_DATA_NETWORK_TYPE;
+        }
+        String networkType = SystemProperties.get(propertyNetworkType,"unknown");
+
+        //Log.d(TAG,"onCreate: number="+ number +", networkType="+ networkType +", VTLoopbackStr="+ VTFramework.getVTFramework().getVTLoopbackStr());//TODO: JB_DISABLE_VT
+
+        //TODO: JB_DISABLE_VT
+        final boolean IsVTLoopbackNumber = false;
+        final boolean networkSupportVT = false;
+        //final boolean IsVTLoopbackNumber =(number != null) && number.equals(VTFramework.getVTFramework().getVTLoopbackStr());
+        //
+        //final boolean networkSupportVT = networkType.contains("UMTS") || networkType.contains("HSDPA") || networkType.contains("HSUPA") 
+        //                              || networkType.contains("HSPA")||IsVTLoopbackNumber;
+
+        final PhoneConstants.State curPhoneState = PhoneGlobals.getInstance().phone[simCardId.toInt()].getState();
+
+        if(Intent.ACTION_CALL_PRIVILEGED.equals(action)
+                && networkSupportVT
+                //&& VTFramework.getVTFramework().IsVTEnable()//TODO: JB_DISABLE_VT
+                && !isEmergencyNumber
+                && (PhoneConstants.State.IDLE == curPhoneState)) { //VT is NOT allowed to make multiparty calls here
+            Log.d(TAG,"onCreate: set ACTION_VT_VOICE_CALL");
+            PhoneGlobals.getInstance().wakeUpScreen();
+            if (intent.hasExtra("operation")) {
+                int op = intent.getIntExtra("operation", PREFERRED_DIAL_VOICE);
+                Log.d(TAG, "onCreate(): op = " + op);
+                if (PREFERRED_DIAL_VIDEO == op) {
+                    intent.setClassName("com.android.phone", "com.android.phone.VTOutgoingCallBroadcaster");
+                } else {
+                    intent.setClassName("com.android.phone", "com.android.phone.VoiceOutgoingCallBroadcaster");
+                }
+            } else {
+                intent.setComponent(null);
+            }
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+            intent.setAction("com.android.phone.action.ACTION_VT_VOICE_CALL");
+            startActivity(intent);
+            finish();
+            return;
+        }else {
+            Log.d(TAG,"onCreate: Don't set ACTION_VT_VOICE_CALL !");
+            Log.d(TAG,"onCreate: networkSupportVT ="+ networkSupportVT +
+                      //", getVTFramework ="+ VTFramework.getVTFramework().IsVTEnable() +//TODO: JB_DISABLE_VT
+                      ", emergencyNumber ="+ isEmergencyNumber +
+                      ", curPhoneState ="+ curPhoneState );
+        }
+        /*videophone end*/
+
         // If true, this flag will indicate that the current call is a special kind
         // of call (most likely an emergency number) that 3rd parties aren't allowed
         // to intercept or affect in any way.  (In that case, we start the call
@@ -495,9 +612,9 @@ public class OutgoingCallBroadcaster extends Activity
         // emergency number but might still result in an emergency call
         // with some networks.)
         final boolean isExactEmergencyNumber =
-                (number != null) && PhoneNumberUtils.isLocalEmergencyNumber(number, this);
+                (number != null) && PhoneNumberUtils.isLocalEmergencyNumber(number, this, simCardId);
         final boolean isPotentialEmergencyNumber =
-                (number != null) && PhoneNumberUtils.isPotentialLocalEmergencyNumber(number, this);
+                (number != null) && PhoneNumberUtils.isPotentialLocalEmergencyNumber(number, this, simCardId);
         if (VDBG) {
             Log.v(TAG, " - Checking restrictions for number '" + number + "':");
             Log.v(TAG, "     isExactEmergencyNumber     = " + isExactEmergencyNumber);
@@ -588,7 +705,7 @@ public class OutgoingCallBroadcaster extends Activity
         if (TextUtils.isEmpty(number)) {
             if (intent.getBooleanExtra(EXTRA_SEND_EMPTY_FLASH, false)) {
                 Log.i(TAG, "onCreate: SEND_EMPTY_FLASH...");
-                PhoneUtils.sendEmptyFlash(PhoneGlobals.getPhone());
+                PhoneUtils.sendEmptyFlash(PhoneGlobals.getPhone(simCardId));
                 finish();
                 return;
             } else {
@@ -606,6 +723,7 @@ public class OutgoingCallBroadcaster extends Activity
 
             // Initiate the outgoing call, and simultaneously launch the
             // InCallScreen to display the in-call UI:
+	    intent.putExtra("simId", simCardId);
             PhoneGlobals.getInstance().callController.placeCall(intent);
 
             // Note we do *not* "return" here, but instead continue and
@@ -630,7 +748,7 @@ public class OutgoingCallBroadcaster extends Activity
         String scheme = uri.getScheme();
         if (Constants.SCHEME_SIP.equals(scheme) || PhoneNumberUtils.isUriNumber(number)) {
             Log.i(TAG, "The requested number was detected as SIP call.");
-            startSipCallOptionHandler(this, intent, uri, number);
+            startSipCallOptionHandler(this, intent, uri, number, simCardId);
             finish();
             return;
 
@@ -646,6 +764,7 @@ public class OutgoingCallBroadcaster extends Activity
         CallGatewayManager.checkAndCopyPhoneProviderExtras(intent, broadcastIntent);
         broadcastIntent.putExtra(EXTRA_ALREADY_CALLED, callNow);
         broadcastIntent.putExtra(EXTRA_ORIGINAL_URI, uri.toString());
+	broadcastIntent.putExtra("simId", simCardId); //dual sim
         // Need to raise foreground in-call UI as soon as possible while allowing 3rd party app
         // to intercept the outgoing call.
         broadcastIntent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);

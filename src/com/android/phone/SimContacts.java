@@ -19,6 +19,7 @@ package com.android.phone;
 import android.accounts.Account;
 import android.app.ActionBar;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.ContentProviderOperation;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -30,6 +31,7 @@ import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds.Email;
@@ -50,6 +52,12 @@ import android.widget.CursorAdapter;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
+import android.content.ContentUris;
+import android.os.PowerManager;
+import android.provider.Contacts.Phones;
+import android.content.Context;
+
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import java.util.ArrayList;
 
@@ -67,7 +75,11 @@ public class SimContacts extends ADNList {
 
     private static final int MENU_IMPORT_ONE = 1;
     private static final int MENU_IMPORT_ALL = 2;
+    private PowerManager.WakeLock mWakeLock;
+    private ImportAllSimContactsThread mThread=null;
     private ProgressDialog mProgressDialog;
+    static final String EXTRA_SIM_ID = "simId";
+    private SimCardID mSimCardId; //for dual sim attention.
 
     private Account mAccount;
 
@@ -96,6 +108,21 @@ public class SimContacts extends ADNList {
         }
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        releaseWakeLock();
+        if(mProgressDialog != null){
+            mProgressDialog.dismiss();
+            mProgressDialog = null;
+        }
+        if (mThread != null) {
+            mThread.onPause();
+            mThread = null;
+        }
+    }
+
     private class ImportAllSimContactsThread extends Thread
             implements OnCancelListener, OnClickListener {
 
@@ -103,6 +130,9 @@ public class SimContacts extends ADNList {
 
         public ImportAllSimContactsThread() {
             super("ImportAllSimContactsThread");
+        }
+        public void onPause() {
+            mCanceled = true;
         }
 
         @Override
@@ -113,10 +143,16 @@ public class SimContacts extends ADNList {
             mCursor.moveToPosition(-1);
             while (!mCanceled && mCursor.moveToNext()) {
                 actuallyImportOneSimContact(mCursor, resolver, mAccount);
-                mProgressDialog.incrementProgressBy(1);
+                if(mProgressDialog != null) {
+                    mProgressDialog.incrementProgressBy(1);
+                }
             }
 
-            mProgressDialog.dismiss();
+            if(mProgressDialog != null) {
+                mProgressDialog.dismiss();
+            }
+            //Release wakelock when the import stop
+            releaseWakeLock();
             finish();
         }
 
@@ -127,7 +163,7 @@ public class SimContacts extends ADNList {
         public void onClick(DialogInterface dialog, int which) {
             if (which == DialogInterface.BUTTON_NEGATIVE) {
                 mCanceled = true;
-                mProgressDialog.dismiss();
+                if (mProgressDialog!=null) mProgressDialog.dismiss();
             } else {
                 Log.e(LOG_TAG, "Unknown button event has come: " + dialog.toString());
             }
@@ -149,6 +185,13 @@ public class SimContacts extends ADNList {
             emailAddressArray = null;
         }
 
+        final String anrs = cursor.getString(ANR_COLUMN);
+        final String[] anrsArray;
+        if (!TextUtils.isEmpty(anrs)) {
+            anrsArray = anrs.split(",");
+        } else {
+            anrsArray = null;
+        }
         final ArrayList<ContentProviderOperation> operationList =
             new ArrayList<ContentProviderOperation>();
         ContentProviderOperation.Builder builder =
@@ -187,6 +230,17 @@ public class SimContacts extends ADNList {
             }
         }
 
+        if (anrsArray != null) {
+            for (String anr : anrsArray) {
+                builder = ContentProviderOperation.newInsert(Data.CONTENT_URI);
+                builder.withValueBackReference(Phone.RAW_CONTACT_ID, 0);
+                builder.withValue(Data.MIMETYPE, Phone.CONTENT_ITEM_TYPE);
+                builder.withValue(Phone.TYPE, Phones.TYPE_OTHER);
+                builder.withValue(Phone.NUMBER, anr);
+                builder.withValue(Data.IS_PRIMARY, 0);
+                operationList.add(builder.build());
+            }
+        }
         if (myGroupsId != null) {
             builder = ContentProviderOperation.newInsert(Data.CONTENT_URI);
             builder.withValueBackReference(GroupMembership.RAW_CONTACT_ID, 0);
@@ -246,7 +300,22 @@ public class SimContacts extends ADNList {
     @Override
     protected Uri resolveIntent() {
         Intent intent = getIntent();
-        intent.setData(Uri.parse("content://icc/adn"));
+        
+        if(intent.hasExtra(EXTRA_SIM_ID)) 
+        {
+            mSimCardId = (SimCardID)(intent.getExtra(EXTRA_SIM_ID, SimCardID.ID_ZERO));
+        } 
+        if (mSimCardId == SimCardID.ID_ONE)
+        {
+            intent.setData(Uri.parse("content://icc2/adn"));
+        }
+        else
+        {
+            mSimCardId = SimCardID.ID_ZERO;
+            intent.setData(Uri.parse("content://icc/adn"));
+        }
+        intent.putExtra(EXTRA_SIM_ID, mSimCardId);
+        
         if (Intent.ACTION_PICK.equals(intent.getAction())) {
             // "index" is 1-based
             mInitialSelection = intent.getIntExtra("index", 0) - 1;
@@ -284,7 +353,7 @@ public class SimContacts extends ADNList {
                 CharSequence title = getString(R.string.importAllSimEntries);
                 CharSequence message = getString(R.string.importingSimContacts);
 
-                ImportAllSimContactsThread thread = new ImportAllSimContactsThread();
+                mThread = new ImportAllSimContactsThread();
 
                 // TODO: need to show some error dialog.
                 if (mCursor == null) {
@@ -296,12 +365,16 @@ public class SimContacts extends ADNList {
                 mProgressDialog.setMessage(message);
                 mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
                 mProgressDialog.setButton(DialogInterface.BUTTON_NEGATIVE,
-                        getString(R.string.cancel), thread);
+                        getString(R.string.cancel), mThread);
                 mProgressDialog.setProgress(0);
                 mProgressDialog.setMax(mCursor.getCount());
                 mProgressDialog.show();
 
-                thread.start();
+                //WakeLock when start import all
+                createWakeLock();
+                acquireWakeLock();
+                
+                mThread.start();
 
                 return true;
         }
@@ -318,6 +391,7 @@ public class SimContacts extends ADNList {
                     importOneSimContact(position);
                     return true;
                 }
+				break;
         }
         return super.onContextItemSelected(item);
     }
@@ -363,5 +437,32 @@ public class SimContacts extends ADNList {
             }
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    private void createWakeLock() {
+        // Create a new wake lock if we haven't made one yet.
+        if (mWakeLock == null) {
+            PowerManager pm = (PowerManager)getSystemService(Context.POWER_SERVICE);
+            mWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK 
+                |PowerManager.ON_AFTER_RELEASE, TAG);
+            mWakeLock.setReferenceCounted(false);
+        }
+    }
+    
+    private void acquireWakeLock() {
+        // It's okay to double-acquire this because we are not using it
+        // in reference-counted mode.
+        if(mWakeLock != null){
+            if (DBG) log("acquireWakeLock");
+            mWakeLock.acquire();
+        }
+    }
+    
+    private void releaseWakeLock() {
+        // Don't release the wake lock if it hasn't been created and acquired.
+        if (mWakeLock != null && mWakeLock.isHeld()) {
+            if (DBG) log("releaseWakeLock");
+            mWakeLock.release();
+        }
     }
 }

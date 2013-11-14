@@ -20,10 +20,12 @@ import android.app.ActivityManager;
 import android.app.ActionBar;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -68,6 +70,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCardConstants;
+import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
+import com.android.internal.telephony.TelephonyIntents;
+
 /**
  * Helper class to manage the "Respond via Message" feature for incoming calls.
  *
@@ -101,10 +109,19 @@ public class RespondViaSmsManager {
      */
     public static class Settings extends PreferenceActivity
             implements Preference.OnPreferenceChangeListener {
+	private int mSimId;
         @Override
         protected void onCreate(Bundle icicle) {
             super.onCreate(icicle);
             if (DBG) log("Settings: onCreate()...");
+
+	    String strSimId = getIntent().getDataString();
+
+            try {
+                 mSimId = Integer.parseInt(strSimId);
+            } catch (NumberFormatException ex) {
+                 mSimId = SimCardID.ID_ZERO.toInt();
+            }
 
             getPreferenceManager().setSharedPreferencesName(SHARED_PREFERENCES_NAME);
 
@@ -190,6 +207,50 @@ public class RespondViaSmsManager {
             getMenuInflater().inflate(R.menu.respond_via_message_settings_menu, menu);
             return super.onCreateOptionsMenu(menu);
         }
+        /* BRCM add - start */
+        @Override
+        protected void onResume() {
+            super.onResume();
+
+            IntentFilter intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+            registerReceiver(mIccCardAbsentReceiver, intentFilter);
+        }
+
+        /**
+         * Receives SIM Absent intent.
+         * When a broadcasted intent of SIM absent is received,
+         * call setup activity of the relative SIM should be finished.
+         */
+        BroadcastReceiver mIccCardAbsentReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                    final String iccCardState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+                    final SimCardID simCardId = (SimCardID)(intent.getExtra("simId", SimCardID.ID_ZERO));
+                    if (iccCardState.equals(IccCardConstants.INTENT_VALUE_ICC_ABSENT)
+                             && mSimId == simCardId.toInt()) {
+                        log("IccCard.MSG_SIM_STATE_ABSENT simCardId = " + simCardId);
+                        makeThisFinish();
+                    }
+                }
+            }
+        };
+
+        /**
+         * Finish this activity.
+         * This is called when SIM removed.
+         */
+        private void makeThisFinish() {
+            this.finish();
+        }
+
+        @Override
+        protected void onPause() {
+            log("onPause");
+            super.onPause();
+            unregisterReceiver(mIccCardAbsentReceiver);
+        }
+        /* BRCM add - end */
     }
 
     private static void log(String msg) {

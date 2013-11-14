@@ -22,6 +22,8 @@ import android.os.Parcelable;
 import com.android.internal.telephony.PhoneConstants;
 import com.google.common.base.Objects;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
+
 /**
  * Class object used across CallHandlerService APIs. Describes a single call and its state.
  */
@@ -42,6 +44,9 @@ public final class CallIdentification implements Parcelable {
     // Name associated with the other end of the connection; from the carrier.
     private String mCnapName = "";
 
+    // SIM ID
+    private SimCardID mSimCardId = SimCardID.ID_ZERO;
+    
     public CallIdentification(int callId) {
         mCallId = callId;
     }
@@ -52,6 +57,7 @@ public final class CallIdentification implements Parcelable {
         mNumberPresentation = identification.mNumberPresentation;
         mCnapNamePresentation = identification.mCnapNamePresentation;
         mCnapName = identification.mCnapName;
+        mSimCardId = identification.mSimCardId;
     }
 
     public int getCallId() {
@@ -90,6 +96,14 @@ public final class CallIdentification implements Parcelable {
         mCnapName = cnapName;
     }
 
+    public SimCardID getSimCardId() {
+        return mSimCardId;
+    }
+
+    public void setSimCardId(SimCardID simCardId) {
+        mSimCardId = simCardId;
+    }
+
     /**
      * Parcelable implementation
      */
@@ -101,6 +115,7 @@ public final class CallIdentification implements Parcelable {
         dest.writeInt(mNumberPresentation);
         dest.writeInt(mCnapNamePresentation);
         dest.writeString(mCnapName);
+        dest.writeInt(mSimCardId.toInt());
     }
 
     /**
@@ -112,6 +127,13 @@ public final class CallIdentification implements Parcelable {
         mNumberPresentation = in.readInt();
         mCnapNamePresentation = in.readInt();
         mCnapName = in.readString();
+
+	int simIdVal = in.readInt();
+	if (simIdVal == SimCardID.ID_ONE.toInt()) {
+            mSimCardId = SimCardID.ID_ONE;
+	} else {
+            mSimCardId = SimCardID.ID_ZERO;
+        }
     }
 
     @Override
@@ -143,6 +165,7 @@ public final class CallIdentification implements Parcelable {
                 .add("mNumberPresentation", mNumberPresentation)
                 .add("mCnapName", MoreStrings.toSafeString(mCnapName))
                 .add("mCnapNamePresentation", mCnapNamePresentation)
+                .add("mSimCardId", mSimCardId)
                 .toString();
     }
 }

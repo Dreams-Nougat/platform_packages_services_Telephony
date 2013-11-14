@@ -42,6 +42,7 @@ import android.util.Log;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * Displays dialog that enables users to exit Emergency Callback Mode
@@ -91,7 +92,7 @@ public class EmergencyCallbackModeExitDialog extends Activity implements OnDismi
         waitForConnectionCompleteThread.start();
 
         // Register ECM timer reset notfication
-        mPhone = PhoneGlobals.getPhone();
+        mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         mPhone.registerForEcmTimerReset(mTimerResetHandler, ECM_TIMER_RESET, null);
 
         // Register receiver for intent closing the dialog

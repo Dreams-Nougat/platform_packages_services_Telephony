@@ -28,6 +28,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Window;
 import android.widget.Toast;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 import static android.view.Window.PROGRESS_VISIBILITY_OFF;
 import static android.view.Window.PROGRESS_VISIBILITY_ON;
@@ -41,12 +43,14 @@ public class DeleteFdnContactScreen extends Activity {
 
     private static final String INTENT_EXTRA_NAME = "name";
     private static final String INTENT_EXTRA_NUMBER = "number";
+    private static final String INTENT_SIM_ID = "sim_id";
 
     private static final int PIN2_REQUEST_CODE = 100;
 
     private String mName;
     private String mNumber;
     private String mPin2;
+    private int mSimId;
 
     protected QueryHandler mQueryHandler;
 
@@ -91,6 +95,7 @@ public class DeleteFdnContactScreen extends Activity {
 
         mName =  intent.getStringExtra(INTENT_EXTRA_NAME);
         mNumber =  intent.getStringExtra(INTENT_EXTRA_NUMBER);
+        mSimId = intent.getIntExtra(INTENT_SIM_ID, SimCardID.ID_ZERO.toInt());
 
         if (TextUtils.isEmpty(mNumber)) {
             finish();
@@ -102,7 +107,7 @@ public class DeleteFdnContactScreen extends Activity {
         if (TextUtils.isEmpty(mName)) {
             buf.append("number='");
         } else {
-            buf.append("tag='");
+            buf.append("name='");
             buf.append(mName);
             buf.append("' AND number='");
         }
@@ -111,7 +116,13 @@ public class DeleteFdnContactScreen extends Activity {
         buf.append(mPin2);
         buf.append("'");
 
-        Uri uri = Uri.parse("content://icc/fdn");
+        String uriData = null;
+        if (SimCardID.ID_ONE.toInt() == mSimId) {
+            uriData = "content://icc2/fdn";
+        } else {
+            uriData = "content://icc/fdn";
+        }
+        Uri uri = Uri.parse(uriData);
 
         mQueryHandler = new QueryHandler(getContentResolver());
         mQueryHandler.startDelete(0, null, uri, buf.toString(), null);

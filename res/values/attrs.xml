@@ -37,6 +37,8 @@
             <enum name="voice" value="1" />
             <!-- data -->
             <enum name="data" value="2" />
+	    <!-- data sync -->
+            <enum name="data_sync" value="16" />
         </attr>
         <attr name="reason">
             <!-- unconditional  -->

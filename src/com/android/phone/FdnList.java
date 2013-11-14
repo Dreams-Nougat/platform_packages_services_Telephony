@@ -25,7 +25,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ListView;
-
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.RILConstants.SimCardID;
 /**
  * FDN List UI for the Phone app.
  */
@@ -36,6 +37,13 @@ public class FdnList extends ADNList {
 
     private static final String INTENT_EXTRA_NAME = "name";
     private static final String INTENT_EXTRA_NUMBER = "number";
+    private static final String INTENT_SIM_ID = "sim_id";
+
+    //add for dual mode
+    private int mSimId = SimCardID.ID_ZERO.toInt();
+	//Added for the indicator if we already have retrieved sim id, since multiple calls to resolveIntent() will change the intent data 
+	//which we use to check sim id.
+	private boolean mSimIdRetrieved;
 
     @Override
     public void onCreate(Bundle icicle) {
@@ -51,7 +59,20 @@ public class FdnList extends ADNList {
     @Override
     protected Uri resolveIntent() {
         Intent intent = getIntent();
-        intent.setData(Uri.parse("content://icc/fdn"));
+		if(!mSimIdRetrieved){
+	        String strSimId = getIntent().getDataString();
+	        try {
+	            mSimId = Integer.parseInt(strSimId);
+	        } catch (NumberFormatException ex) {
+	            mSimId = SimCardID.ID_ZERO.toInt();
+	        }
+			mSimIdRetrieved = true;
+		}
+        if (SimCardID.ID_ONE.toInt() == mSimId) {
+            intent.setData(Uri.parse("content://icc2/fdn"));
+        } else {
+            intent.setData(Uri.parse("content://icc/fdn"));
+        }
         return intent.getData();
     }
 
@@ -121,6 +142,7 @@ public class FdnList extends ADNList {
         // EditFdnContactScreen treats it like add contact.
         Intent intent = new Intent();
         intent.setClass(this, EditFdnContactScreen.class);
+        intent.putExtra(INTENT_SIM_ID, mSimId);
         startActivity(intent);
     }
 
@@ -146,6 +168,7 @@ public class FdnList extends ADNList {
             intent.setClass(this, EditFdnContactScreen.class);
             intent.putExtra(INTENT_EXTRA_NAME, name);
             intent.putExtra(INTENT_EXTRA_NUMBER, number);
+            intent.putExtra(INTENT_SIM_ID, mSimId);
             startActivity(intent);
         }
     }
@@ -159,6 +182,7 @@ public class FdnList extends ADNList {
             intent.setClass(this, DeleteFdnContactScreen.class);
             intent.putExtra(INTENT_EXTRA_NAME, name);
             intent.putExtra(INTENT_EXTRA_NUMBER, number);
+            intent.putExtra(INTENT_SIM_ID, mSimId);
             startActivity(intent);
         }
     }

@@ -32,6 +32,7 @@ import android.provider.Settings;
 import android.telephony.ServiceState;
 import android.util.Log;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * Helper class for the {@link CallController} that implements special
@@ -126,8 +127,12 @@ public class EmergencyCallHelper extends Handler {
      * PhoneApp.displayCallScreen().)
      */
     public void startEmergencyCallFromAirplaneModeSequence(String number) {
-        if (DBG) log("startEmergencyCallFromAirplaneModeSequence('" + number + "')...");
-        Message msg = obtainMessage(START_SEQUENCE, number);
+        startEmergencyCallFromAirplaneModeSequence(number, SimCardID.ID_ZERO.toInt());
+    }
+
+    public void startEmergencyCallFromAirplaneModeSequence(String number, int simId) {
+        if (DBG) log("startEmergencyCallFromAirplaneModeSequence('" + number + "')... simId = " + simId);
+        Message msg = this.obtainMessage(START_SEQUENCE, simId, 0, number);
         sendMessage(msg);
     }
 
@@ -146,10 +151,21 @@ public class EmergencyCallHelper extends Handler {
         // we're already in the middle of the sequence.
         cleanup();
 
+        SimCardID simCardId;
+
+        if (SimCardID.ID_ONE.toInt() == msg.arg1) {
+            simCardId = SimCardID.ID_ONE;
+        } else {
+            simCardId = SimCardID.ID_ZERO;
+        }
+
         mNumber = (String) msg.obj;
-        if (DBG) log("- startSequenceInternal: Got mNumber: '" + mNumber + "'");
+        if (DBG) log("- startSequenceInternal: Got mNumber: '" + mNumber + "', simCardId = " + simCardId);
 
         mNumRetriesSoFar = 0;
+
+        // Reset mPhone to whatever the current default phone is right now.
+        mPhone = mApp.mCM.getDefaultPhone(simCardId);
 
         // Wake lock to make sure the processor doesn't go to sleep midway
         // through the emergency call sequence.

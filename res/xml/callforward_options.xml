@@ -12,6 +12,10 @@
            1. android:singleLine
            2. android:autoText
            3. android:background -->
+    <PreferenceCategory
+        android:key="button_voicemail_category_key"
+        android:title="@string/VoiceForwarding"
+        android:persistent="false">
 
     <com.android.phone.CallForwardEditPreference
         android:key="button_cfu_key"
@@ -78,4 +82,74 @@
         android:singleLine="true"
         android:autoText="false"
         android:enabled="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="button_voicemail_category_key"
+        android:title="@string/VideoTelephonyForwarding"
+        android:persistent="false">       
+ 
+    <!-- See note on com.android.phone.EditPreference above -->
+    <com.android.phone.CallForwardEditPreference
+        android:key="button_data_cfu_key"
+        android:title="@string/labelDataCFU"
+        android:persistent="false"
+        android:summaryOn="@string/sum_data_cfu_enabled"
+        android:summaryOff="@string/sum_data_cfu_disabled"
+        android:dialogTitle="@string/labelDataCFU"
+        android:dialogMessage="@string/messageDataCFU"
+        phone:confirmMode="activation"
+        phone:serviceClass="data_sync"
+        phone:reason="unconditional"
+        android:singleLine="true"
+        android:autoText="false"/>
+
+    <!-- See note on com.android.phone.EditPreference above -->
+    <com.android.phone.CallForwardEditPreference
+        android:key="button_data_cfb_key"
+        android:title="@string/labelDataCFB"
+        android:persistent="false"
+        android:summaryOn="@string/sum_data_cfb_enabled"
+        android:summaryOff="@string/sum_data_cfb_disabled"
+        android:dialogTitle="@string/labelDataCFB"
+        android:dialogMessage="@string/messageDataCFB"
+        phone:confirmMode="activation"
+        phone:serviceClass="data_sync"
+        phone:reason="busy"
+        android:dependency="button_data_cfu_key"
+        android:singleLine="true"
+        android:autoText="false"/>
+
+    <!-- See note on com.android.phone.EditPreference above -->
+    <com.android.phone.CallForwardEditPreference
+        android:key="button_data_cfnry_key"
+        android:title="@string/labelDataCFNRy"
+        android:persistent="false"
+        android:summaryOn="@string/sum_data_cfnry_enabled"
+        android:summaryOff="@string/sum_data_cfnry_disabled"
+        android:dialogTitle="@string/labelDataCFNRy"
+        android:dialogMessage="@string/messageDataCFNRy"
+        phone:confirmMode="activation"
+        phone:serviceClass="data_sync"
+        phone:reason="no_reply"
+        android:dependency="button_data_cfu_key"
+        android:singleLine="true"
+        android:autoText="false"/>
+
+    <!-- See note on com.android.phone.EditPreference above -->
+    <com.android.phone.CallForwardEditPreference
+        android:key="button_data_cfnrc_key"
+        android:title="@string/labelDataCFNRc"
+        android:persistent="false"
+        android:summaryOn="@string/sum_data_cfnrc_enabled"
+        android:summaryOff="@string/sum_data_cfnrc_disabled"
+        android:dialogTitle="@string/labelDataCFNRc"
+        android:dialogMessage="@string/messageDataCFNRc"
+        phone:confirmMode="activation"
+        phone:serviceClass="data_sync"
+        phone:reason="not_reachable"
+        android:dependency="button_data_cfu_key"
+        android:singleLine="true"
+        android:autoText="false"/>        
+  </PreferenceCategory>
 </PreferenceScreen>

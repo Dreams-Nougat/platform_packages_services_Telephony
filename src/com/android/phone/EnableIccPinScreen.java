@@ -31,6 +31,7 @@ import android.widget.TextView;
 
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * UI to enable/disable the ICC PIN.
@@ -67,7 +68,7 @@ public class EnableIccPinScreen extends Activity {
         setContentView(R.layout.enable_sim_pin_screen);
         setupView();
 
-        mPhone = PhoneGlobals.getPhone();
+        mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         mEnable = !mPhone.getIccCard().getIccLockEnabled();
 
         int id = mEnable ? R.string.enable_sim_pin : R.string.disable_sim_pin;

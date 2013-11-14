@@ -50,6 +50,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
+/* dual sim */
+import com.android.internal.telephony.RILConstants.SimCardID;
+
+
 /**
  * Handles all OTASP Call related logic and UI functionality.
  * The InCallScreen interacts with this class to perform an OTASP Call.
@@ -229,7 +233,7 @@ public class OtaUtils {
      */
     public static boolean maybeDoOtaCall(Context context, Handler handler, int request) {
         PhoneGlobals app = PhoneGlobals.getInstance();
-        Phone phone = app.phone;
+        Phone phone = app.phone[SimCardID.ID_ZERO.toInt()];
 
         if (ActivityManager.isRunningInTestHarness()) {
             Log.i(LOG_TAG, "Don't run provisioning when in test harness");
@@ -394,7 +398,7 @@ public class OtaUtils {
         // TODO(InCallScreen redesign): This should probably go through
         // the CallController, rather than directly calling
         // PhoneUtils.placeCall().
-        Phone phone = PhoneGlobals.getPhone();
+        Phone phone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         String number = OTASP_NUMBER_NON_INTERACTIVE;
         Log.i(LOG_TAG, "startNonInteractiveOtasp: placing call to '" + number + "'...");
         int callStatus = PhoneUtils.placeCall(context,

@@ -49,4 +49,82 @@
         <item>@string/sip_always_send_keepalive</item>
     </string-array>
 
+    <!-- default sim for data connection options. -->
+    <string-array name="default_sim_for_data_connection_entries">
+        <item>SIM 1 as default</item>
+        <item>SIM 2 as default</item>
+    </string-array>
+
+    <!-- Values for default_sim_for_data_connection_entries matching constants in network_settings. Do not translate. -->
+    <string-array name="default_sim_for_data_connection_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+
+    <!-- sim1 absent data connection options. -->
+    <string-array name="sim1_absent_data_connection_entries">
+        <item>SIM 2 as default</item>
+    </string-array>
+
+    <!-- Values for sim1_absent_data_connection_entries matching constants in network_settings. Do not translate. -->
+    <string-array name="sim1_absent_data_connection_values" translatable="false">
+        <item>1</item>
+    </string-array>
+
+    <!-- sim2 absent data connection options. -->
+    <string-array name="sim2_absent_data_connection_entries">
+        <item>SIM 1 as default</item>
+    </string-array>
+
+    <!-- Values for sim2_absent_data_connection_entries matching constants in network_settings. Do not translate. -->
+    <string-array name="sim2_absent_data_connection_values" translatable="false">
+        <item>0</item>
+    </string-array>
+
+    <string-array name="default_sim_for_3g_network_entries">
+        <item>SIM1 is 3G prefer</item>
+        <item>SIM2 is 3G prefer</item>
+        <item>Both SIMs are 2G</item>
+    </string-array>
+
+    <string-array name="default_sim_for_3g_network_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    
+    <string-array name="dual_3g_network_entries">
+        <item>SIM1 is 3G prefer</item>
+        <item>SIM2 is 3G prefer</item>
+        <item>Both SIMs are 2G</item>
+        <item>Both SIMs are 3G</item>
+    </string-array>
+
+    <string-array name="dual_3g_network_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+
+    <string-array name="sim1_absent_3g_network_entries">
+        <item>SIM2 is 3G prefer</item>
+        <item>SIM2 is 2G</item>
+    </string-array>
+
+    <string-array name="sim1_absent_3g_network_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    
+    <string-array name="sim2_absent_3g_network_entries">
+        <item>SIM1 is 3G prefer</item>
+        <item>SIM1 is 2G</item>
+    </string-array>
+
+    <string-array name="sim2_absent_3g_network_values" translatable="false">
+        <item>0</item>
+        <item>2</item>
+    </string-array>
 </resources>

@@ -31,6 +31,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
+import com.android.internal.telephony.RILConstants.SimCardID;
 
 /**
  * List of Phone-specific settings screens.
@@ -337,7 +338,7 @@ public class CellBroadcastSms extends PreferenceActivity
 
         addPreferencesFromResource(R.xml.cell_broadcast_sms);
 
-        mPhone = PhoneGlobals.getPhone();
+        mPhone = PhoneGlobals.getPhone(SimCardID.ID_ZERO);
         mHandler = new MyHandler();
 
         PreferenceScreen prefSet = getPreferenceScreen();

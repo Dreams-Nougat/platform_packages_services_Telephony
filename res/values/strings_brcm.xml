@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2007 The Android Open Source Project
+     Copyright (C) 2009-2010 Broadcom Corporation
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- BRCM customized resource -->
+    <!-- Call Barring -->
+    <!-- Call Barring setting item label -->
+    <string name="labelCB">Call Barring</string>
+
+    <!-- Call Barring Options -->
+    <!-- Call Barring Disabled -->
+    <string name="cb_disabled">Disabled</string>
+    <!-- Call Barring Enabled -->
+    <string name="cb_enabled">Enabled</string>
+    <!-- GsmUmtsCallBarringOptions screen Title -->
+    <string name="call_barring_settings">Call Barring Settings</string>
+
+    <!-- Voice Call Barring Preference Category-->
+    <string name="VoiceCallBarring">Voice Call</string>
+    <string name="labelCB_BAOC">All outgoing calls</string>
+    <string name="labelCB_BOIC">Outgoing international</string>
+    <string name="labelCB_BOICxH">Outgoing international roaming</string>
+    <string name="labelCB_BAIC">All incoming calls</string>
+    <string name="labelCB_BICr">Incoming calls when roaming</string>
+
+    <!-- Video Telephony Call Barring Preference Category-->
+    <string name="VideoTelephonyCallBarring">Video Call</string>
+
+    <!-- Call Barring Other -->
+    <string name="cb_other_title">Other Setting</string>
+    <!-- Deactivate All -->
+    <string name="labelCB_disable_all_cb">Deactivate all</string>
+    <string name="cb_disable_all_cb_summary">Deactivate all call barring</string>
+    <!-- Call Barring Password -->
+    <string name="labelCB_change_password">Change password</string>
+    <string name="cb_change_password_summary">Change all call barring password</string>
+    <string name="cb_password_dialog_title_default">Call barring password</string>
+    <string name="cb_password_dialog_message_default">Enter call barring password</string>
+    <string name="cb_password_dialog_message_new_password">Enter new password</string>
+    <string name="cb_password_dialog_message_reenter_password">Re-enter new password</string>
+    <string name="password_enter_ok">OK</string>
+    <string name="password_enter_cancel">Cancel</string>
+    <!-- Message -->
+    <string name="cb_pwd_changed">Password Changed</string>
+
+    <!-- MMI dialog strings -->
+    <!-- Dialog label when an MMI code complete and is in a PENDING state-->
+    <string name="mmiResponse_PENDING">MMI Response Request</string>
+
+    <string name="sim_account_type_label">SIM</string>
+    <!-- Incoming call menu: Title -->
+    <string name="menu_title">Answer incoming call option</string>
+    <!-- Incoming call menu: Label for "Hold and answer" menu item -->
+    <string name="menu_answerAndHold">Hold current call\n&amp; answer</string>
+    <!-- Incoming call menu: Label for "End and answer" menu item -->
+    <string name="menu_answerAndEnd">End current call\n&amp; answer</string>
+    <!-- VT call hidden button  -->
+    <string name="onscreenVTHiddenText">Hidden Me</string>
+    <!-- VT call switch camera button  -->
+    <string name="onscreenVTSwitchCameraText">Switch Camera</string>
+
+    <!-- PLMN search is not allowed error during voice call -->
+    <string name="network_search_not_allowed">This operation is not allowed during call.</string>
+    <string name="network_search_disconnect_warning">Unable to search networks during data service activated.\nDo you want to disconnect the data service and search available network?</string>
+
+    <!-- BRCM SIM_NAME start -->
+    <string name="sim_name_title">SIM select name</string>
+    <string name="sim_name_on">Enabled</string>
+    <string name="sim_name_off">Disabled, use operator name</string>
+    <string name="sim_name_setting_title">SIM select name setting</string>
+    <string name="sim_name_setting_description">SIM select name not set</string>
+    <!-- BRCM SIM_NAME end -->
+
+    <!-- SIM dialog start -->
+    <string name="new_sim_title">New SIM inserted</string>
+    <string name="sim_mobile_networks_setting">Settings</string>
+    <!-- SIM dialog end -->
+
+    <!-- In-call screen: call failure reason (user alerting, no answer) -->
+    <string name="callFailed_userAlertingNoAnswer">No answer to user alerting</string>
+
+    <!-- Error message displayed on SIM Network Depersonalization panel -->
+    <string name="unlock_failed_remaincount">Unsuccessful!! Remain %1$d unlock chances</string>
+    <string name="NetworkPUKRequired">Network PUK Required!! Please contact your Service Provider</string>
+
+   <!-- Call forwarding category -->
+    <string name="VoiceForwarding">Voice</string>
+   <!-- Call forwarding category -->
+    <string name="VideoTelephonyForwarding">Video Telephony</string>
+
+   <!-- Call forwarding settings screen, setting option name -->
+    <string name="labelDataCFU">Always forward</string>
+    <!-- Call forwarding dialog box, text field label -->
+    <string name="messageDataCFU">Always use this number</string>
+    <!-- Call forwarding settings screen, setting summary text when forwarding all calls -->
+    <string name="sum_data_cfu_enabled_indicator">Forwarding all Video Telephony calls</string>
+    <!-- Call forwarding settings screen, setting summary text the Always forward is set -->
+    <string name="sum_data_cfu_enabled">Forwarding all calls to {0}</string>
+    <!-- Call forwarding settings screen, Always forward is enabled but the number is unavailable -->
+    <string name="sum_data_cfu_enabled_no_number">Number is unavailable</string>
+    <!-- Call forwarding settings screen, setting summary text when Always forward is disabled -->
+    <string name="sum_data_cfu_disabled">Disabled</string>
+
+
+    <!-- Call forwarding settings screen, setting option name -->
+    <string name="labelDataCFB">Forward when busy</string>
+    <!-- Call forwarding dialog box, text field label -->
+    <string name="messageDataCFB">Number when busy</string>
+    <!-- Call forwarding settings screen, setting summary text when forwarding to specific number when busy -->
+    <string name="sum_data_cfb_enabled">Forwarding to {0}</string>
+    <!-- Call forwarding settings screen, setting summary text when forwarding when busy is disabled -->
+    <string name="sum_data_cfb_disabled">Disabled</string>
+    <!-- Error message displayed after failing to disable forwarding calls when the phone is busy -->
+    <string name="disable_data_cfb_forbidden">Your carrier does not support disabling video telephony call-forwarding when your phone is busy.</string>
+
+    <!-- Call forwarding settings screen, setting option name -->
+    <string name="labelDataCFNRy">Forward when unanswered</string>
+    <!-- Call forwarding dialog box, text field label -->
+    <string name="messageDataCFNRy">Number when unanswered</string>
+    <!-- Call forwarding settings screen, setting summary text when forwarding to a specific number when unanswered -->
+    <string name="sum_data_cfnry_enabled">Forwarding to {0}</string>
+    <!-- Call forwarding settings screen, setting summary text when Forward when unanswered is disabled -->
+    <string name="sum_data_cfnry_disabled">Disabled</string>
+    <!-- Error message displayed after failing to disable forwarding calls when the phone does not answer -->
+    <string name="disable_data_cfnry_forbidden">Your carrier does not support disabling video telephony call-forwarding when your phone doesn\'t answer.</string>
+
+    <!-- Call forwarding settings screen, setting option name -->
+    <string name="labelDataCFNRc">Forward when unreachable</string>
+    <!-- Call forwarding dialog box, text field label -->
+    <string name="messageDataCFNRc">Number when unreachable</string>
+    <!-- Call forwarding settings screen, setting summary text when forwarding to a specific number when unreachable-->
+    <string name="sum_data_cfnrc_enabled">Forwarding to {0}</string>
+    <!-- Call forwarding settings screen, setting summary text when Forward when unreachable is disabled -->
+    <string name="sum_data_cfnrc_disabled">Disabled</string>
+    <!-- Error message displayed after failing to disable forwarding calls when the phone is unreachable -->
+    <string name="disable_data_cfnrc_forbidden">Your carrier does not support disabling video telephony call-forwarding when your phone is unreachable.</string>
+
+    <!-- Mobile network settings screen, data enabling checkbox name -->
+    <string name="bpm_enabled">BPM enabled</string>
+    <!-- Mobile network settings screen, setting summary text when check box is not selected (explains what selecting it would do) -->
+    <string name="bpm_enable_summary">Enable/Disable BPM mode</string>
+
+    <!-- Mobile network settings screen, setting check box name -->
+    <string name="roaming_sim_1">SIM 1 data roaming</string>
+    <!-- Mobile network settings screen, setting check box name -->
+    <string name="roaming_sim_2">SIM 2 data roaming</string>
+    <string name="roaming_warning_sim_1">Allow SIM 1 data roaming? You may incur significant roaming charges!</string>
+    <string name="roaming_warning_sim_2">Allow SIM 2 data roaming? You may incur significant roaming charges!</string>
+
+    <!-- Cell broadcast SMS strings -->
+    <string name="cell_broadcast_title">Cell broadcast</string>
+    <string name="cell_broadcast_on">Enable receipt of CB messages</string>
+    <string name="cell_broadcast_off">Disable receipt of CB messages</string>
+    <string name="cell_broadcast_settings_title">Cell broadcast settings</string>
+    <string name="cell_broadcast_settings_description">Set cell broadcast channel and language</string>
+    <string name="erase_channels_warning">All Channels will be erased after the phone restarts\nAre you sure?</string>
+    <string name="receive_channel_list">Receive channel list</string>
+    <string name="lang_list_title">Language</string>
+    <string name="lang_selection_summary">All languages</string>
+    <string name="receive_channel_type_title">Receiving channel</string>
+
+    <string-array name="receive_channel_type_entries">
+        <item>My channel</item>
+        <item>All channels</item>
+    </string-array>
+    <string-array name="receive_channel_type_values">
+        <item>"0"</item>
+        <item>"1"</item>
+    </string-array>
+
+    <string-array name="cb_list_language_entries">
+        <item>German</item>
+        <item>English</item>
+        <item>Italian</item>
+        <item>French</item>
+        <item>Spanish</item>
+        <item>Dutch</item>
+        <item>Swedish</item>
+        <item>Danish</item>
+        <item>Portuguese</item>
+        <item>Finnish</item>
+        <item>Norwegian</item>
+        <item>Greek</item>
+        <item>Turkish</item>
+        <item>Hungarian</item>
+        <item>Polish</item>
+        <item>All languages</item>
+    </string-array>
+    <string-array name="cb_list_language_values">
+        <item>"0"</item>
+        <item>"1"</item>
+        <item>"2"</item>
+        <item>"3"</item>
+        <item>"4"</item>
+        <item>"5"</item>
+        <item>"6"</item>
+        <item>"7"</item>
+        <item>"8"</item>
+        <item>"9"</item>
+        <item>"10"</item>
+        <item>"11"</item>
+        <item>"12"</item>
+        <item>"13"</item>
+        <item>"14"</item>
+        <item>"15"</item>
+    </string-array>
+    <string name="select_lang_dialog_title">Select Language</string>
+
+    <string name="add_channel_title">Add Channel</string>
+    <string name="channel_info_title">Channel Info.</string>
+    <string name="channel_name_title">Channel Name</string>
+    <string name="channel_number_title">Channel Number</string>
+    <string name="enable_channel_title">Enable the channel</string>
+    <string name="delete_button_text">Delete</string>
+    <string name="info_required">Please enter channel name and number.</string>
+    <string name="channel_exist">This channel number already exists.</string>
+    <string name="channel_enabled">Enabled</string>
+    <string name="channel_disabled">Disabled</string>
+    <string name="channel_list_category_title">Channel list</string>
+
+    <string name="unlock_pin2">Unlock PIN2</string>
+
+    <string name="simContacts_no_sim">No SIM card.</string>
+
+    <!-- In-call screen: status label for a call that's in video call mode -->
+    <string name="card_title_suffix_video_call">(Video call)</string>
+
+    <!-- The "label" of the in-call Notification for an ongoing VT call, used
+         as the format string for a Chronometer widget. -->
+    <string name="notification_ongoing_vtcall_format">Current VT call (<xliff:g id="duration">%s</xliff:g>)</string>
+
+    <!-- In-call screen: call failure message displayed in an error dialog -->
+    <string name="incall_error_sim1_power_off">SIM 1 power is off.</string>
+    <!-- In-call screen: call failure message displayed in an error dialog -->
+    <string name="incall_error_sim2_power_off">SIM 2 power is off.</string>
+
+    <!-- Menu item used to select different phone for dual mode--> 
+    <string name="dualMode_SIM1">SIM1 </string>   
+    <string name="dualMode_SIM2">SIM2 </string> 
+
+    <string name="sim1_call_settings_title">SIM1 Call Settings</string>
+    <string name="sim2_call_settings_title">SIM2 Call Settings</string>
+
+    <string name="gsm_umts_category_title_sim_1">SIM 1 other settings</string>   
+    <string name="gsm_umts_category_title_sim_2">SIM 2 other settings</string>   
+    <string name="default_sim_data_connection_title">Data connection</string>
+    <string name="default_sim_data_connection_summary">Default sim for data connection</string>
+    <string name="default_data_network_switch_error">Data network switch error!</string>
+    <string name="default_sim_data_connection_progress">Change default data connection...</string>
+    <string name="default_sim_changed_summary">Connecting ...</string>
+    <string name="default_sim_for_3g_network_title">3G network</string>
+    <string name="default_sim_for_3g_network_summary">Default SIM for 3G network</string>
+    <string name="default_sim_for_3g_network_changed_summary">Connecting ...</string>
+
+    <!-- When press the dial button in emergency dialer, let user chooser sim -->
+    <string name="select_sim">Select SIM</string>
+    <string name="sim_chooser_sim_one">SIM 1</string>
+    <string name="sim_chooser_sim_two">SIM 2</string>
+    <string name="save_button_text">Save</string>
+
+    <!-- videophone -->
+    <string name="onStatus">Status</string>
+    <string name="title">VideoPhone</string>
+    <string name="titleVoice">Dialer</string>    
+    <string name="BlockVideo">Toggle Video</string>
+    <string name="PauseVideo">Halt Local Video</string>
+    <string name="ResumeVideo">Resume Local Video</string>
+    <string name="RecordFile">Record File</string>
+    <string name="StopRecording">Stop Recording</string>    
+    <string name="StopSending">Stop Sending</string>        
+    <string name="SendFile">Send File</string>
+    <string name="SwitchCamera">Switch Camera</string>
+    <string name="Config">Configuration</string>
+    <string name="SwitchVideo">Switch Video</string>
+    <string name="RecLocal">Local</string>  
+    <string name="RecRemote">Remote</string>   
+    <string name="SVSLBR">Local Small Remote Large</string>  
+    <string name="SVSRBL">Local Large Remote Small</string> 
+    <string name="SVOnlyBL">Only Local Large</string>    
+    <string name="SVOnlyBR">Only Remote Large</string>    
+    <string name="SendFileVideo">Video</string> 
+    <string name="SendFileJPEG">JPEG</string> 
+    <string name="SendFileBMP">BMP</string>   
+    <string name="vt_send_local_video">Send your video to the other side?</string>
+    <!-- end videophone -->
+</resources>
