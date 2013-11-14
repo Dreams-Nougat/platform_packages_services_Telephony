@@ -111,6 +111,8 @@
     <string name="unlock_failed">Network unlock request unsuccessful.</string>
     <!-- Success message displayed on SIM Network Depersonalization panel -->
     <string name="unlock_success">Network unlock successful.</string>
+    <!-- Message displayed when the SIM card is removed or sim is not ready -->
+    <string name="sim_error">No SIM card or SIM error</string>
 
     <!-- settings strings -->
 
