@@ -48,6 +48,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneFactory;
 
 /**
@@ -56,6 +57,8 @@ import com.android.internal.telephony.PhoneFactory;
 public class EditFdnContactScreen extends Activity {
     private static final String LOG_TAG = PhoneGlobals.LOG_TAG;
     private static final boolean DBG = false;
+    protected static final int FAILURE = 0;
+    protected static final int SUCCESS = 1;
 
     // Menu item codes
     private static final int MENU_IMPORT = 1;
@@ -285,7 +288,7 @@ public class EditFdnContactScreen extends Activity {
         final String number = PhoneNumberUtils.convertAndStrip(getNumberFromTextField());
 
         if (!isValidNumber(number)) {
-            handleResult(false, true);
+            handleResult(FAILURE, true);
             return;
         }
 
@@ -309,7 +312,7 @@ public class EditFdnContactScreen extends Activity {
         final String number = PhoneNumberUtils.convertAndStrip(getNumberFromTextField());
 
         if (!isValidNumber(number)) {
-            handleResult(false, true);
+            handleResult(FAILURE, true);
             return;
         }
         Uri uri = getContentURI();
@@ -370,8 +373,8 @@ public class EditFdnContactScreen extends Activity {
         }
     }
 
-    private void handleResult(boolean success, boolean invalidNumber) {
-        if (success) {
+    protected void handleResult(int result, boolean invalidNumber) {
+        if (result == SUCCESS) {
             if (DBG) log("handleResult: success!");
             showStatus(getResources().getText(mAddContact ?
                     R.string.fdn_contact_added : R.string.fdn_contact_updated));
@@ -380,14 +383,18 @@ public class EditFdnContactScreen extends Activity {
             if (invalidNumber) {
                 showStatus(getResources().getText(R.string.fdn_invalid_number));
             } else {
-               if (PhoneFactory.getDefaultPhone().getIccCard().getIccPin2Blocked()) {
-                    showStatus(getResources().getText(R.string.fdn_enable_puk2_requested));
-                } else if (PhoneFactory.getDefaultPhone().getIccCard().getIccPuk2Blocked()) {
+                if(PhoneFactory.getDefaultPhone().getIccCard().getIccPuk2Blocked()) {
                     showStatus(getResources().getText(R.string.puk2_blocked));
                 } else {
-                    // There's no way to know whether the failure is due to incorrect PIN2 or
-                    // an inappropriate phone number.
-                    showStatus(getResources().getText(R.string.pin2_or_fdn_invalid));
+                    if (result == PhoneConstants.ERROR_PIN2_PASSWORD_INCORRECT) {
+                        showStatus(getResources().getText(R.string.pin2_invalid));
+                    } else if (result == PhoneConstants.ERROR_PIN2_SIM_PUK2) {
+                        showStatus(getResources().getText(R.string.fdn_enable_puk2_requested));
+                    } else {
+                        // There's no way to know whether the failure is due to incorrect PIN2 or
+                        // an inappropriate phone number.
+                        showStatus(getResources().getText(R.string.pin2_or_fdn_invalid));
+                    }
                 }
             }
         }
@@ -446,14 +453,18 @@ public class EditFdnContactScreen extends Activity {
         protected void onInsertComplete(int token, Object cookie, Uri uri) {
             if (DBG) log("onInsertComplete");
             displayProgress(false);
-            handleResult(uri != null, false);
+            int result = FAILURE;
+            if (uri != null) {
+                result = SUCCESS;
+            }
+            handleResult(result, false);
         }
 
         @Override
         protected void onUpdateComplete(int token, Object cookie, int result) {
             if (DBG) log("onUpdateComplete");
             displayProgress(false);
-            handleResult(result > 0, false);
+            handleResult(result, false);
         }
 
         @Override
