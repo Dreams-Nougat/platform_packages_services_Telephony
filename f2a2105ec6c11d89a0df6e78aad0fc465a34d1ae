@@ -1,0 +1,18 @@
+Revision: f2a2105ec6c11d89a0df6e78aad0fc465a34d1ae
+Base-for-patch-set: 2
+File: src/com/android/phone/PhoneInterfaceManager.java
+
+335:29-335:32
+Wed Jan 01 14:32:05 2014 +0000
+Author: Thomas Lehner <1017978@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: a832dbd0_7047c835
+Bytes: 49
+for ending a call the call-permission is needed!?
+
+344:31-344:34
+Wed Jan 01 14:32:05 2014 +0000
+Author: Thomas Lehner <1017978@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: a832dbd0_504ac440
+Bytes: 164
+for answering the modify-permission is used, which is a system permission (so app developers could not use this function even in the case they would use reflection)
+
