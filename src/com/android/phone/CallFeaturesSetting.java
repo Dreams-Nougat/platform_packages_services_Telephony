@@ -175,6 +175,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     private static final String BUTTON_RESPOND_VIA_SMS_KEY   = "button_respond_via_sms_key";
 
     private static final String BUTTON_RINGTONE_KEY    = "button_ringtone_key";
+    private static final String BUTTON_INCREASING_RINGTONE  = "button_increasing_ringtone";
     private static final String BUTTON_VIBRATE_ON_RING = "button_vibrate_on_ring";
     private static final String BUTTON_PLAY_DTMF_TONE  = "button_play_dtmf_tone";
     private static final String BUTTON_DTMF_KEY        = "button_dtmf_settings";
@@ -265,6 +266,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     };
 
     private Preference mRingtonePreference;
+    private CheckBoxPreference mIncreasingRingtone;
     private CheckBoxPreference mVibrateWhenRinging;
     /** Whether dialpad plays DTMF tone or not. */
     private CheckBoxPreference mPlayDtmfTone;
@@ -480,7 +482,11 @@ public class CallFeaturesSetting extends PreferenceActivity
     // Click listener for all toggle events
     @Override
     public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference preference) {
-        if (preference == mSubMenuVoicemailSettings) {
+         if (preference == mIncreasingRingtone) {
+            Settings.System.putInt(mPhone.getContext().getContentResolver(),
+                    Settings.System.INCREASING_RINGTONE, mIncreasingRingtone.isChecked() ? 1 : 0);
+            return true;
+        } else if (preference == mSubMenuVoicemailSettings) {
             return true;
         } else if (preference == mPlayDtmfTone) {
             Settings.System.putInt(getContentResolver(), Settings.System.DTMF_TONE_WHEN_DIALING,
@@ -550,6 +556,10 @@ public class CallFeaturesSetting extends PreferenceActivity
             boolean doVibrate = (Boolean) objValue;
             Settings.System.putInt(mPhone.getContext().getContentResolver(),
                     Settings.System.VIBRATE_WHEN_RINGING, doVibrate ? 1 : 0);
+        } else if (preference == mIncreasingRingtone) {
+            boolean increasingRing = (Boolean) objValue;
+            Settings.System.putInt(mPhone.getContext().getContentResolver(),
+                    Settings.System.INCREASING_RINGTONE, increasingRing ? 1 : 0);
         } else if (preference == mButtonDTMF) {
             int index = mButtonDTMF.findIndexOfValue((String) objValue);
             Settings.System.putInt(mPhone.getContext().getContentResolver(),
@@ -1517,6 +1527,7 @@ public class CallFeaturesSetting extends PreferenceActivity
         }
 
         mRingtonePreference = findPreference(BUTTON_RINGTONE_KEY);
+        mIncreasingRingtone = (CheckBoxPreference) findPreference(BUTTON_INCREASING_RINGTONE);
         mVibrateWhenRinging = (CheckBoxPreference) findPreference(BUTTON_VIBRATE_ON_RING);
         mPlayDtmfTone = (CheckBoxPreference) findPreference(BUTTON_PLAY_DTMF_TONE);
         mButtonDTMF = (ListPreference) findPreference(BUTTON_DTMF_KEY);
@@ -1545,6 +1556,11 @@ public class CallFeaturesSetting extends PreferenceActivity
         }
 
         final ContentResolver contentResolver = getContentResolver();
+
+        if (mIncreasingRingtone != null) {
+           mIncreasingRingtone.setChecked(Settings.System.getInt(contentResolver,
+                    Settings.System.INCREASING_RINGTONE, 0) != 0);
+        }
 
         if (mPlayDtmfTone != null) {
             mPlayDtmfTone.setChecked(Settings.System.getInt(contentResolver,
@@ -1770,6 +1786,10 @@ public class CallFeaturesSetting extends PreferenceActivity
             return;
         }
 
+        if (mIncreasingRingtone != null) {
+            mIncreasingRingtone.setChecked(getIncreasingRingtone(this));
+        }
+
         if (mVibrateWhenRinging != null) {
             mVibrateWhenRinging.setChecked(getVibrateWhenRinging(this));
         }
@@ -1826,6 +1846,14 @@ public class CallFeaturesSetting extends PreferenceActivity
             return true;
         }
         return false;
+    }
+
+     /**
+     * Obtain the setting for "increasing ringtone" setting.
+     */
+    public static boolean getIncreasingRingtone(Context context) {
+        return Settings.System.getInt(context.getContentResolver(),
+                Settings.System.INCREASING_RINGTONE, 0) != 0;
     }
 
     /**

@@ -1499,6 +1499,11 @@
     <!-- Setting option name to pick ringtone (a list dialog comes up). [CHAR LIMIT=30] -->
     <string name="ringtone_title" msgid="5379026328015343686">Phone ringtone</string>
 
+    <!-- Setting option name to enable or disable Increasing ringtone. Increasing ringtone
+         will if user does not answer call start to ascend / increase the volume of the
+         ring signal. [CHAR LIMIT=40] -->
+    <string name="increasing_ringtone_title">Increasing ringtone</string>
+
     <!-- Setting option name to enable or disable vibration when ringing
          the phone.
          [CHAR LIMIT=30] -->

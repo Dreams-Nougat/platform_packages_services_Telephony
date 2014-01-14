@@ -45,9 +45,12 @@ public class Ringer {
 
     private static final int PLAY_RING_ONCE = 1;
     private static final int STOP_RING = 3;
+    private static final int INCREASE_RING_VOLUME = 4;
 
     private static final int VIBRATE_LENGTH = 1000; // ms
     private static final int PAUSE_LENGTH = 1000; // ms
+    private static final int INCREASING_RINGTONE_INITIAL_INTERVAL = 6000; // ms
+    private static final int INCREASING_RINGTONE_INTERVAL = 4000; // ms
 
     /** The singleton instance. */
     private static Ringer sInstance;
@@ -59,6 +62,7 @@ public class Ringer {
     Ringtone mRingtone;
     Vibrator mVibrator;
     IPowerManager mPowerManager;
+    AudioManager mAudioManager;
     volatile boolean mContinueVibrating;
     VibratorThread mVibratorThread;
     Context mContext;
@@ -66,6 +70,7 @@ public class Ringer {
     private Handler mRingHandler;
     private long mFirstRingEventTime = -1;
     private long mFirstRingStartTime = -1;
+    private int mRingerVolumeSetting = -1;
 
     /**
      * Initialize the singleton Ringer instance.
@@ -91,6 +96,7 @@ public class Ringer {
         // We don't rely on getSystemService(Context.VIBRATOR_SERVICE) to make sure this
         // vibrator object will be isolated from others.
         mVibrator = new SystemVibrator(context);
+        mAudioManager = (AudioManager)context.getSystemService(Context.AUDIO_SERVICE);
     }
 
     /**
@@ -167,16 +173,25 @@ public class Ringer {
                 if (DBG) log("- starting vibrator...");
                 mVibratorThread.start();
             }
-            AudioManager audioManager =
-                    (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+            int ringerVolume = mAudioManager.getStreamVolume(AudioManager.STREAM_RING);
 
-            if (audioManager.getStreamVolume(AudioManager.STREAM_RING) == 0) {
+            if (ringerVolume == 0) {
                 if (DBG) log("skipping ring because volume is zero");
                 return;
             }
 
             makeLooper();
             if (mFirstRingEventTime < 0) {
+                boolean increase = CallFeaturesSetting.getIncreasingRingtone(mContext);
+
+                if (increase) {
+                    mRingerVolumeSetting = ringerVolume;
+                    mRingHandler.sendEmptyMessageDelayed(
+                            INCREASE_RING_VOLUME, INCREASING_RINGTONE_INITIAL_INTERVAL);
+                } else {
+                    mRingerVolumeSetting = -1;
+                }
+
                 mFirstRingEventTime = SystemClock.elapsedRealtime();
                 mRingHandler.sendEmptyMessage(PLAY_RING_ONCE);
             } else {
@@ -223,6 +238,13 @@ public class Ringer {
                 mPowerManager.setAttentionLight(false, 0x00000000);
             } catch (RemoteException ex) {
                 // the other end of this binder call is in the system process.
+            }
+
+            if (mRingerVolumeSetting >= 0) {
+                // if we modified the ringer volume, change it back to the
+                // original value.
+                mAudioManager.setStreamVolume(AudioManager.STREAM_RING, mRingerVolumeSetting, 0);
+                mRingerVolumeSetting = -1;
             }
 
             if (mRingHandler != null) {
@@ -312,6 +334,16 @@ public class Ringer {
                 public void handleMessage(Message msg) {
                     Ringtone r = null;
                     switch (msg.what) {
+                        case INCREASE_RING_VOLUME:
+                            int curVolume = mAudioManager.getStreamVolume(AudioManager.STREAM_RING);
+                            if (mRingerVolumeSetting > 0) {
+                                curVolume++;
+                                mAudioManager.setStreamVolume(
+                                        AudioManager.STREAM_RING, curVolume, 0);
+                                sendEmptyMessageDelayed(INCREASE_RING_VOLUME,
+                                        INCREASING_RINGTONE_INTERVAL);
+                            }
+                            break;
                         case PLAY_RING_ONCE:
                             if (DBG) log("mRingHandler: PLAY_RING_ONCE...");
                             if (mRingtone == null && !hasMessages(STOP_RING)) {
