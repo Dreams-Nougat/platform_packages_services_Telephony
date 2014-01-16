@@ -1,0 +1,32 @@
+Revision: e5e5715f860726eb1dbd33dba7d06defee1b9a5b
+Patch-set: 4
+File: src/com/android/phone/msim/MSPhone.java
+
+0
+Thu Jan 16 21:31:22 2014 +0000
+Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 2dca7dde_954c0e08
+Bytes: 241
+Move all of the files in /msim/ up one directory from:
+
+  src/com/android/phone/msim/
+
+to:
+
+  src/com/android/phone/
+
+
+Or change all of their packages to:
+
+  package com.android.phone.msim
+I moved them up a directory because that was easier.
+
+File: src/com/android/phone/msim/MSimPhoneGlobals.java
+
+209:37-209:57
+Thu Jan 16 21:31:22 2014 +0000
+Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 4dd5f177_418c966b
+Bytes: 68
+I had to make change the CallGatewayManager from private to package?
+
