@@ -1,0 +1,24 @@
+Revision: 45d5e453be70f5e5fa54853983cd730ccb1c2389
+Patch-set: 6
+File: src/com/android/phone/msim/MSPhone.java
+
+17
+Wed Jan 22 22:20:27 2014 +0000
+Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 92bf0a8c_c9d49112
+Bytes: 299
+The package for all of these files needs to be:
+
+  com.android.phone.msim;
+
+I had moved them up a level but since we've now got com.android.internal.telephony.msim lets change the package statement here and in all of the other files as well as any body referencing them. (See comment in patch set 4)
+
+File: src/com/android/phone/msim/MSimPhoneGlobals.java
+
+209:37-209:55
+Wed Jan 22 22:20:27 2014 +0000
+Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: b2ba4e9a_0d04f56e
+Bytes: 58
+CallGatewayManager needs to be package instead of private.
+
