@@ -95,6 +95,7 @@ public class CallModeler extends Handler {
     private final ArrayList<Listener> mListeners = new ArrayList<Listener>();
     private Connection mCdmaIncomingConnection;
     private Connection mCdmaOutgoingConnection;
+    private boolean mVoicePrivacyState = false;
 
     public CallModeler(CallStateMonitor callStateMonitor, CallManager callManager,
             CallGatewayManager callGatewayManager) {
@@ -123,6 +124,20 @@ public class CallModeler extends Handler {
                 break;
             case CallStateMonitor.PHONE_ON_DIAL_CHARS:
                 onPostDialChars((AsyncResult) msg.obj, (char) msg.arg1);
+                break;
+            case CallStateMonitor.PHONE_ENHANCED_VP_ON:
+                if (DBG) Log.d(TAG, "PHONE_ENHANCED_VP_ON...");
+                if (!mVoicePrivacyState) {
+                    mVoicePrivacyState = true;
+                    onPhoneStateChanged(null);
+                }
+                break;
+            case CallStateMonitor.PHONE_ENHANCED_VP_OFF:
+                if (DBG) Log.d(TAG, "PHONE_ENHANCED_VP_OFF...");
+                if (mVoicePrivacyState) {
+                    mVoicePrivacyState = false;
+                    onPhoneStateChanged(null);
+                }
                 break;
             default:
                 break;
@@ -307,6 +322,8 @@ public class CallModeler extends Handler {
 
     private void onDisconnect(Connection conn) {
         Log.i(TAG, "onDisconnect");
+
+        mVoicePrivacyState = false;
         final Call call = getCallFromMap(mCallMap, conn, false);
 
         if (call != null) {
@@ -646,6 +663,7 @@ public class CallModeler extends Handler {
         boolean canSwapCall = false;
         boolean canRespondViaText = false;
         boolean canMute = false;
+        boolean voicePrivacy = false;
 
         final boolean supportHold = PhoneUtils.okToSupportHold(mCallManager);
         final boolean canHold = (supportHold ? PhoneUtils.okToHoldCall(mCallManager) : false);
@@ -685,6 +703,11 @@ public class CallModeler extends Handler {
             canAddCall = true;
         }
 
+        //Voice Privacy for CDMA
+        if ((phone.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) && mVoicePrivacyState) {
+            voicePrivacy = true;
+        }
+
         int retval = 0x0;
         if (canHold) {
             retval |= Capabilities.HOLD;
@@ -710,7 +733,9 @@ public class CallModeler extends Handler {
         if (genericConf) {
             retval |= Capabilities.GENERIC_CONFERENCE;
         }
-
+        if (voicePrivacy) {
+            retval |= Capabilities.VOICE_PRIVACY;
+        }
         return retval;
     }
 
