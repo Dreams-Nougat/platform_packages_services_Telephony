@@ -430,6 +430,9 @@ public class BluetoothPhoneService extends Service {
             new BluetoothProfile.ServiceListener() {
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
             mBluetoothHeadset = (BluetoothHeadset) proxy;
+            /* Inform profile about current phone call indicators */
+            Message msg = Message.obtain(mHandler, QUERY_PHONE_STATE);
+            mHandler.sendMessage(msg);
         }
         public void onServiceDisconnected(int profile) {
             mBluetoothHeadset = null;
