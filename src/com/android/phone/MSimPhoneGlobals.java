@@ -103,7 +103,7 @@ public class MSimPhoneGlobals extends PhoneGlobals {
 
     private int mDefaultSubscription = 0;
 
-    MSimPhoneInterfaceManager phoneMgrMSim;
+    PhoneInterfaceManager phoneMgrMSim;
 
     MSimPhoneGlobals(Context context) {
         super(context);
@@ -250,7 +250,7 @@ public class MSimPhoneGlobals extends PhoneGlobals {
                     callCommandService, audioRouter);
 
             phoneMgr = PhoneInterfaceManager.init(this, phone, callHandlerServiceProxy);
-            phoneMgrMSim = MSimPhoneInterfaceManager.init(this, phone, callHandlerServiceProxy);
+            phoneMgrMSim = PhoneInterfaceManager.init(this, phone, callHandlerServiceProxy);
 
             // Create the CallNotifer singleton, which handles
             // asynchronous events from the telephony layer (like
