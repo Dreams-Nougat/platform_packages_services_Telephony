@@ -16,6 +16,7 @@
 
 package com.android.phone;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Bundle;
@@ -31,7 +32,7 @@ import android.util.Log;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyProperties;
 
-public class CdmaSystemSelectListPreference extends ListPreference {
+public class CdmaSystemSelectListPreference extends ListPreference implements PhoneGlobals.SimInfoUpdateListener {
 
     private static final String LOG_TAG = "CdmaRoamingListPreference";
     private static final boolean DBG = false;
@@ -60,6 +61,7 @@ public class CdmaSystemSelectListPreference extends ListPreference {
         } else {
             super.showDialog(state);
         }
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
     }
 
     @Override
@@ -93,6 +95,7 @@ public class CdmaSystemSelectListPreference extends ListPreference {
             Log.d(LOG_TAG, String.format("onDialogClosed: positiveResult=%b value=%s -- do nothing",
                     positiveResult, getValue()));
         }
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
     }
 
     private class MyHandler extends Handler {
@@ -166,6 +169,14 @@ public class CdmaSystemSelectListPreference extends ListPreference {
             //Set the Status
             mPhone.setCdmaRoamingPreference(Phone.CDMA_RM_HOME,
                     obtainMessage(MyHandler.MESSAGE_SET_ROAMING_PREFERENCE));
+        }
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        Dialog dialog = getDialog();
+        if (dialog != null) {
+            dialog.dismiss();
         }
     }
 

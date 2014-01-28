@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+
+        <com.android.internal.widget.SubscriptionView
+            android:id="@+id/subInfoView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <ImageView
+            android:id="@+id/suggestedView"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginRight="4dp"
+            android:src="@drawable/sub_suggested"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+
+    <TextView
+        android:id="@+id/noSubInfoText"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:layout_marginStart="4dp"
+        android:clickable="false"
+        android:enabled="false"
+        android:focusable="false"
+        android:visibility="gone" />
+
+</FrameLayout>
