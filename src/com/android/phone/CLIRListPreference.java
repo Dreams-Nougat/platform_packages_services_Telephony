@@ -4,6 +4,7 @@ import static com.android.phone.TimeConsumingPreferenceActivity.RESPONSE_ERROR;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneProxyManager;
 
 import android.content.Context;
 import android.os.AsyncResult;
@@ -23,15 +24,13 @@ public class CLIRListPreference extends ListPreference {
     private final boolean DBG = (PhoneGlobals.DBG_LEVEL >= 2);
 
     private final MyHandler mHandler = new MyHandler();
-    private final Phone mPhone;
+    private Phone mPhone;
     private TimeConsumingPreferenceListener mTcpListener;
 
     int clirArray[];
 
     public CLIRListPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
-
-        mPhone = PhoneGlobals.getPhone();
     }
 
     public CLIRListPreference(Context context) {
@@ -49,9 +48,10 @@ public class CLIRListPreference extends ListPreference {
         }
     }
 
-    /* package */ void init(TimeConsumingPreferenceListener listener, boolean skipReading) {
+    /* package */ void init(TimeConsumingPreferenceListener listener, boolean skipReading, long subId) {
         mTcpListener = listener;
         if (!skipReading) {
+            mPhone = PhoneUtils.getPhoneUsingSub(subId);
             mPhone.getOutgoingCallerIdDisplay(mHandler.obtainMessage(MyHandler.MESSAGE_GET_CLIR,
                     MyHandler.MESSAGE_GET_CLIR, MyHandler.MESSAGE_GET_CLIR));
             if (mTcpListener != null) {
