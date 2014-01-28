@@ -32,6 +32,7 @@ import android.os.Handler;
 import android.provider.Contacts.PeopleColumns;
 import android.provider.Contacts.PhonesColumns;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.SubscriptionManager;
 import android.text.Selection;
 import android.text.Spannable;
 import android.text.TextUtils;
@@ -48,12 +49,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneFactory;
 
 /**
  * Activity to let the user add or edit an FDN contact.
  */
-public class EditFdnContactScreen extends Activity {
+public class EditFdnContactScreen extends Activity implements PhoneGlobals.SimInfoUpdateListener {
     private static final String LOG_TAG = PhoneGlobals.LOG_TAG;
     private static final boolean DBG = false;
 
@@ -78,6 +80,8 @@ public class EditFdnContactScreen extends Activity {
     private Button mButton;
 
     private Handler mHandler = new Handler();
+
+    private long mSubId = SubscriptionManager.SIM_NOT_INSERTED;
 
     /**
      * Constants used in importing from contacts
@@ -109,6 +113,8 @@ public class EditFdnContactScreen extends Activity {
                 R.string.add_fdn_contact : R.string.edit_fdn_contact);
 
         displayProgress(false);
+
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
     }
 
     /**
@@ -214,7 +220,8 @@ public class EditFdnContactScreen extends Activity {
 
         mName =  intent.getStringExtra(INTENT_EXTRA_NAME);
         mNumber =  intent.getStringExtra(INTENT_EXTRA_NUMBER);
-
+        mSubId = intent.getLongExtra(
+                PhoneConstants.SUBSCRIPTION_KEY, SubscriptionManager.SIM_NOT_INSERTED);
         mAddContact = TextUtils.isEmpty(mNumber);
     }
 
@@ -265,7 +272,7 @@ public class EditFdnContactScreen extends Activity {
     }
 
     private Uri getContentURI() {
-        return Uri.parse("content://icc/fdn");
+        return Uri.parse("content://icc/fdn" + mSubId);
     }
 
     /**
@@ -335,6 +342,7 @@ public class EditFdnContactScreen extends Activity {
         if (!mAddContact) {
             Intent intent = new Intent();
             intent.setClass(this, DeleteFdnContactScreen.class);
+            intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, mSubId);
             intent.putExtra(INTENT_EXTRA_NAME, mName);
             intent.putExtra(INTENT_EXTRA_NUMBER, mNumber);
             startActivity(intent);
@@ -345,6 +353,7 @@ public class EditFdnContactScreen extends Activity {
     private void authenticatePin2() {
         Intent intent = new Intent();
         intent.setClass(this, GetPin2Screen.class);
+        intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, mSubId);
         startActivityForResult(intent, PIN2_REQUEST_CODE);
     }
 
@@ -380,9 +389,9 @@ public class EditFdnContactScreen extends Activity {
             if (invalidNumber) {
                 showStatus(getResources().getText(R.string.fdn_invalid_number));
             } else {
-               if (PhoneFactory.getDefaultPhone().getIccCard().getIccPin2Blocked()) {
+               if (PhoneUtils.getPhoneUsingSub(mSubId).getIccCard().getIccPin2Blocked()) {
                     showStatus(getResources().getText(R.string.fdn_enable_puk2_requested));
-                } else if (PhoneFactory.getDefaultPhone().getIccCard().getIccPuk2Blocked()) {
+                } else if (PhoneUtils.getPhoneUsingSub(mSubId).getIccCard().getIccPuk2Blocked()) {
                     showStatus(getResources().getText(R.string.puk2_blocked));
                 } else {
                     // There's no way to know whether the failure is due to incorrect PIN2 or
@@ -459,6 +468,17 @@ public class EditFdnContactScreen extends Activity {
         @Override
         protected void onDeleteComplete(int token, Object cookie, int result) {
         }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        finish();
     }
 
     private void log(String msg) {

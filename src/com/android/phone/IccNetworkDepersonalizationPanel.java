@@ -108,8 +108,9 @@ public class IccNetworkDepersonalizationPanel extends IccPanel {
     };
 
     //constructor
-    public IccNetworkDepersonalizationPanel(Context context) {
+    public IccNetworkDepersonalizationPanel(Context context, Phone phone) {
         super(context);
+        mPhone = phone;
     }
 
     @Override
@@ -147,8 +148,6 @@ public class IccNetworkDepersonalizationPanel extends IccPanel {
         //status panel is used since we're having problems with the alert dialog.
         mStatusPanel = (LinearLayout) findViewById(R.id.status_panel);
         mStatusText = (TextView) findViewById(R.id.status_text);
-
-        mPhone = PhoneGlobals.getPhone();
     }
 
     @Override

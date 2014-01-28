@@ -16,6 +16,7 @@
 
 package com.android.phone;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Bundle;
@@ -30,7 +31,7 @@ import android.util.Log;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
 
-public class CdmaSubscriptionListPreference extends ListPreference {
+public class CdmaSubscriptionListPreference extends ListPreference implements PhoneGlobals.SimInfoUpdateListener {
 
     private static final String LOG_TAG = "CdmaSubscriptionListPreference";
 
@@ -68,6 +69,7 @@ public class CdmaSubscriptionListPreference extends ListPreference {
         setCurrentCdmaSubscriptionModeValue();
 
         super.showDialog(state);
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
     }
 
     @Override
@@ -98,7 +100,7 @@ public class CdmaSubscriptionListPreference extends ListPreference {
         mPhone.setCdmaSubscription(statusCdmaSubscriptionMode, mHandler
                 .obtainMessage(CdmaSubscriptionButtonHandler.MESSAGE_SET_CDMA_SUBSCRIPTION,
                         getValue()));
-
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
     }
 
     private class CdmaSubscriptionButtonHandler extends Handler {
@@ -127,6 +129,14 @@ public class CdmaSubscriptionListPreference extends ListPreference {
             } else {
                 Log.e(LOG_TAG, "Setting Cdma subscription source failed");
             }
+        }
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        Dialog dialog = getDialog();
+        if (dialog != null) {
+            dialog.dismiss();
         }
     }
 }

@@ -2,6 +2,9 @@ package com.android.phone;
 
 import com.android.internal.telephony.CallForwardInfo;
 import com.android.internal.telephony.CommandsInterface;
+import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.widget.SubscriptionView;
+import com.android.phone.SubPickHandler.SubPickListener;
 
 import android.app.ActionBar;
 import android.content.Intent;
@@ -10,13 +13,16 @@ import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceScreen;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
+import android.telephony.SubscriptionManager;
 import android.util.Log;
 import android.view.MenuItem;
 
 import java.util.ArrayList;
 
 
-public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
+public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity
+        implements PhoneGlobals.SimInfoUpdateListener, SubPickListener{
+
     private static final String LOG_TAG = "GsmUmtsCallForwardOptions";
     private final boolean DBG = (PhoneGlobals.DBG_LEVEL >= 2);
 
@@ -42,6 +48,7 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
 
     private boolean mFirstResume;
     private Bundle mIcicle;
+    private long mSubId = SubscriptionManager.SIM_NOT_INSERTED;
 
     @Override
     protected void onCreate(Bundle icicle) {
@@ -69,7 +76,6 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
         // TimeConsumingPreferenceActivity dialog can display as it
         // relies on onResume / onPause to maintain its foreground state.
 
-        mFirstResume = true;
         mIcicle = icicle;
 
         ActionBar actionBar = getActionBar();
@@ -77,16 +83,33 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
             // android.R.id.home will be triggered in onOptionsItemSelected()
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
+
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
+
+        doSubPick();
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
+    private void doSubPick() {
+        if (SubscriptionManager.getAllSubInfoCount(this) == 1) {
+            final long subId = PhoneUtils.getFirstActiveSubInfoRecord(this).mSubId;
+            onSubPickComplete(SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB, subId, null);
+        } else if (SubscriptionManager.getAllSubInfoCount(this) > 1) {
+            SubPickHandler subPickHandler = new SubPickHandler(this,
+                    SubPickHandler.getSubPickItemList(this, false, false));
+            subPickHandler.setSubPickListener(this);
+            subPickHandler.setSubViewThemeType(SubscriptionView.LIGHT_THEME);
+            subPickHandler.showSubPickDialog(
+                    getPreferenceScreen().getTitle().toString(), true);
+        } else {
+            finish();
+        }
+    }
 
+    private void initUi() {
         if (mFirstResume) {
             if (mIcicle == null) {
                 if (DBG) Log.d(LOG_TAG, "start to init ");
-                mPreferences.get(mInitIndex).init(this, false);
+                mPreferences.get(mInitIndex).init(this, false, mSubId);
             } else {
                 mInitIndex = mPreferences.size();
 
@@ -97,7 +120,7 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
                     cf.number = bundle.getString(KEY_NUMBER);
                     cf.status = bundle.getInt(KEY_STATUS);
                     pref.handleCallForwardResult(cf);
-                    pref.init(this, true);
+                    pref.init(this, true, mSubId);
                 }
             }
             mFirstResume = false;
@@ -124,7 +147,7 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
     public void onFinished(Preference preference, boolean reading) {
         if (mInitIndex < mPreferences.size()-1 && !isFinishing()) {
             mInitIndex++;
-            mPreferences.get(mInitIndex).init(this, false);
+            mPreferences.get(mInitIndex).init(this, false, mSubId);
         }
 
         super.onFinished(preference, reading);
@@ -177,5 +200,29 @@ public class GsmUmtsCallForwardOptions extends TimeConsumingPreferenceActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        finish();
+    }
+
+    @Override
+    public void onSubPickComplete(int completeKey, long subId, Intent intent) {
+        if (DBG) Log.d(LOG_TAG, "onSubPickComplete, completeKey = " +
+                completeKey + "; subId = " + subId);
+        if (SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB == completeKey) {
+            mSubId = subId;
+            mFirstResume = true;
+            initUi();
+        } else if (SubPickHandler.SUB_PICK_COMPLETE_KEY_CANCEL == completeKey) {
+            finish();
+        }
     }
 }
