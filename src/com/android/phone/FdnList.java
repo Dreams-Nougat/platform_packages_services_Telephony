@@ -16,11 +16,14 @@
 
 package com.android.phone;
 
+import com.android.internal.telephony.PhoneConstants;
+
 import android.app.ActionBar;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Bundle;
+import android.telephony.SubscriptionController;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -29,7 +32,7 @@ import android.widget.ListView;
 /**
  * FDN List UI for the Phone app.
  */
-public class FdnList extends ADNList {
+public class FdnList extends ADNList implements PhoneGlobals.SimInfoUpdateListener {
     private static final int MENU_ADD = 1;
     private static final int MENU_EDIT = 2;
     private static final int MENU_DELETE = 3;
@@ -46,12 +49,14 @@ public class FdnList extends ADNList {
             // android.R.id.home will be triggered in onOptionsItemSelected()
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
+
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
     }
 
     @Override
     protected Uri resolveIntent() {
         Intent intent = getIntent();
-        intent.setData(Uri.parse("content://icc/fdn"));
+        intent.setData(Uri.parse("content://icc/fdn" + mSubId));
         return intent.getData();
     }
 
@@ -88,6 +93,7 @@ public class FdnList extends ADNList {
         switch (item.getItemId()) {
             case android.R.id.home:  // See ActionBar#setDisplayHomeAsUpEnabled()
                 Intent intent = new Intent(this, FdnSetting.class);
+                intent.putExtra(PhoneConstants.SUB_ID_KEY, mSubId);
                 intent.setAction(Intent.ACTION_MAIN);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(intent);
@@ -121,6 +127,7 @@ public class FdnList extends ADNList {
         // EditFdnContactScreen treats it like add contact.
         Intent intent = new Intent();
         intent.setClass(this, EditFdnContactScreen.class);
+        intent.putExtra(PhoneConstants.SUB_ID_KEY, mSubId);
         startActivity(intent);
     }
 
@@ -144,6 +151,7 @@ public class FdnList extends ADNList {
 
             Intent intent = new Intent();
             intent.setClass(this, EditFdnContactScreen.class);
+            intent.putExtra(PhoneConstants.SUB_ID_KEY, mSubId);
             intent.putExtra(INTENT_EXTRA_NAME, name);
             intent.putExtra(INTENT_EXTRA_NUMBER, number);
             startActivity(intent);
@@ -157,9 +165,21 @@ public class FdnList extends ADNList {
 
             Intent intent = new Intent();
             intent.setClass(this, DeleteFdnContactScreen.class);
+            intent.putExtra(PhoneConstants.SUB_ID_KEY, mSubId);
             intent.putExtra(INTENT_EXTRA_NAME, name);
             intent.putExtra(INTENT_EXTRA_NUMBER, number);
             startActivity(intent);
         }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        finish();
     }
 }

@@ -19,6 +19,7 @@ package com.android.phone;
 import com.android.internal.telephony.CallManager;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.PhoneProxyManager;
 import com.android.internal.telephony.TelephonyCapabilities;
 import com.android.phone.CallGatewayManager.RawGatewayInfo;
 import com.android.phone.Constants.CallStatusCode;
@@ -32,6 +33,7 @@ import android.os.SystemProperties;
 import android.provider.CallLog.Calls;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
+import android.telephony.SubscriptionController;
 import android.util.Log;
 
 /**
@@ -207,11 +209,14 @@ public class CallController extends Handler {
 
         String scheme = uri.getScheme();
         String number = PhoneNumberUtils.getNumberFromIntent(intent, mApp);
+        long subId = intent.getLongExtra(PhoneConstants.SUB_ID_KEY, SubPickHandler.INVALID_SUB_ID);
+
         if (VDBG) {
             log("- action: " + action);
             log("- uri: " + uri);
             log("- scheme: " + scheme);
             log("- number: " + number);
+            log("- sub id: " + subId);
         }
 
         // This method should only be used with the various flavors of CALL
@@ -224,10 +229,16 @@ public class CallController extends Handler {
             throw new IllegalArgumentException("Unexpected action: " + action);
         }
 
+        Phone phone;
+        if (PhoneUtils.isValidSubId(PhoneGlobals.getInstance(), subId)) {
+            phone = PhoneProxyManager.getPhoneProxyUsingSub(subId);
+        } else {
+            phone = PhoneGlobals.getInstance().mCM.getDefaultPhone();
+        }
+
         // Check to see if this is an OTASP call (the "activation" call
         // used to provision CDMA devices), and if so, do some
         // OTASP-specific setup.
-        Phone phone = mApp.mCM.getDefaultPhone();
         if (TelephonyCapabilities.supportsOtasp(phone)) {
             checkForOtaspCall(intent);
         }
@@ -258,7 +269,7 @@ public class CallController extends Handler {
                 // initiating an outgoing call, typically by directing the
                 // InCallScreen to display a diagnostic message (via the
                 // "pending call status code" flag.)
-                handleOutgoingCallError(status);
+                handleOutgoingCallError(status, subId);
                 break;
         }
 
@@ -293,6 +304,7 @@ public class CallController extends Handler {
 
         final Uri uri = intent.getData();
         final String scheme = (uri != null) ? uri.getScheme() : null;
+        long subId = intent.getLongExtra(PhoneConstants.SUB_ID_KEY, SubPickHandler.INVALID_SUB_ID);
         String number;
         Phone phone = null;
 
@@ -320,12 +332,8 @@ public class CallController extends Handler {
             // or any of combinations
             String sipPhoneUri = intent.getStringExtra(
                     OutgoingCallBroadcaster.EXTRA_SIP_PHONE_URI);
-            phone = PhoneUtils.pickPhoneBasedOnNumber(mCM, scheme, number, sipPhoneUri);
+            phone = PhoneUtils.pickPhoneBasedOnNumber(mCM, scheme, number, sipPhoneUri, subId);
             if (VDBG) log("- got Phone instance: " + phone + ", class = " + phone.getClass());
-
-            // update okToCallStatus based on new phone
-            okToCallStatus = checkIfOkToInitiateOutgoingCall(
-                    phone.getServiceState().getState());
 
         } catch (PhoneUtils.VoiceMailNumberMissingException ex) {
             // If the call status is NOT in an acceptable state, it
@@ -366,6 +374,19 @@ public class CallController extends Handler {
                     + " with non-potential-emergency number " + number
                     + " -- failing call.");
             return CallStatusCode.CALL_FAILED;
+        }
+
+        // Select best phone for dial a ECC number
+        if (isEmergencyNumber || (isPotentialEmergencyNumber && isEmergencyIntent)) {
+            phone = PhoneUtils.pickBestPhoneForEmergencyCall();
+        }
+
+        // Check the current ServiceState to make sure it's OKs
+        // to even try making a call.
+        if (phone != null) {
+            okToCallStatus = checkIfOkToInitiateOutgoingCall(phone);
+        } else {
+            okToCallStatus = CallStatusCode.CALL_FAILED;
         }
 
         // If we're trying to call an emergency number, then it's OK to
@@ -577,7 +598,26 @@ public class CallController extends Handler {
         }
     }
 
+    /**
+     * Checks the select phone ServiceState to make sure it's OK to try making
+     * an outgoing call to the specified number.
+     *
+     * @param selectPhone
+     * @return
+     */
+    private CallStatusCode checkIfOkToInitiateOutgoingCall(Phone selectPhone) {
+        log("checkIfOkToInitiateOutgoingCall, selectPhone.getSimId() = " + selectPhone.getSimId());
+        Phone[] phones = PhoneProxyManager.getDefault().getPhoneProxys();
+        for (Phone phone : phones) {
+            if (phone != selectPhone && phone.getState() != PhoneConstants.State.IDLE) {
+                return CallStatusCode.CALL_FAILED;
+            }
+        }
 
+        final int realState = selectPhone.getServiceState().getState();
+        log("realState = " + realState);
+        return checkIfOkToInitiateOutgoingCall(realState);
+    }
 
     /**
      * Handles the various error conditions that can occur when initiating
@@ -588,8 +628,8 @@ public class CallController extends Handler {
      *
      * @param status one of the CallStatusCode error codes.
      */
-    private void handleOutgoingCallError(CallStatusCode status) {
-        if (DBG) log("handleOutgoingCallError(): status = " + status);
+    private void handleOutgoingCallError(CallStatusCode status, long subId) {
+        if (DBG) log("handleOutgoingCallError(): status / subId: " + status + " / " + subId);
         final Intent intent = new Intent(mApp, ErrorDialogActivity.class);
         int errorMessageId = -1;
         switch (status) {
@@ -642,6 +682,7 @@ public class CallController extends Handler {
                 // Send a request to the InCallScreen to display the
                 // "voicemail missing" dialog when it (the InCallScreen)
                 // comes to the foreground.
+                intent.putExtra(PhoneConstants.SUB_ID_KEY, subId);
                 intent.putExtra(ErrorDialogActivity.SHOW_MISSING_VOICEMAIL_NO_DIALOG_EXTRA, true);
                 break;
 

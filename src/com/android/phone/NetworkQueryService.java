@@ -27,7 +27,12 @@ import android.os.Message;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.PhoneProxyManager;
+
+import android.telephony.SimInfoManager;
+import android.telephony.SubscriptionController;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -157,7 +162,6 @@ public class NetworkQueryService extends Service {
     @Override
     public void onCreate() {
         mState = QUERY_READY;
-        mPhone = PhoneFactory.getDefaultPhone();
     }
     
     /**
@@ -166,7 +170,16 @@ public class NetworkQueryService extends Service {
     @Override
     public void onStart(Intent intent, int startId) {
     }
-    
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        long subId = intent.getLongExtra(
+                PhoneConstants.SUB_ID_KEY, SubscriptionController.SIM_NOT_INSERTED);
+        log("onStartCommand, simId = " + subId);
+        mPhone = PhoneProxyManager.getPhoneProxyUsingSub(subId);
+        return super.onStartCommand(intent, flags, startId);
+    }
+
     /**
      * Handle the bind request.
      */

@@ -16,6 +16,8 @@
 
 package com.android.phone;
 
+import java.util.List;
+
 import android.app.Activity;
 import android.app.ActivityManagerNative;
 import android.app.AlertDialog;
@@ -27,7 +29,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
+import android.net.sip.SipManager;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -35,15 +40,26 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.ServiceState;
+import android.telephony.SubscriptionController;
+import android.telephony.SubscriptionController.SubInfoRecord;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
 
+import com.android.internal.telephony.MccTable;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.PhoneProxyManager;
 import com.android.internal.telephony.TelephonyCapabilities;
+import com.android.phone.SubPickHandler;
+import com.android.phone.SubPickAdapter.SubPickItem;
+import com.android.phone.SubPickHandler.SubPickListener;
+import com.android.phone.sip.SipProfileDb;
+import com.android.phone.sip.SipSharedPreferences;
 
 /**
  * OutgoingCallBroadcaster receives CALL and CALL_PRIVILEGED Intents, and
@@ -61,7 +77,8 @@ import com.android.internal.telephony.TelephonyCapabilities;
  * broadcast.
  */
 public class OutgoingCallBroadcaster extends Activity
-        implements DialogInterface.OnClickListener, DialogInterface.OnCancelListener {
+        implements DialogInterface.OnClickListener, DialogInterface.OnCancelListener,
+        SubPickHandler.SubPickListener {
 
     private static final String PERMISSION = android.Manifest.permission.PROCESS_OUTGOING_CALLS;
     private static final String TAG = "OutgoingCallBroadcaster";
@@ -183,13 +200,16 @@ public class OutgoingCallBroadcaster extends Activity
             if (VDBG) Log.v(TAG, "- got number from resultData: '" + number + "'");
 
             final PhoneGlobals app = PhoneGlobals.getInstance();
+            final Phone phone = PhoneProxyManager.getPhoneProxyUsingSub(
+                    intent.getLongExtra(PhoneConstants.SUB_ID_KEY,
+                                SubscriptionController.getDefaultSubId()));
 
             // OTASP-specific checks.
             // TODO: This should probably all happen in
             // OutgoingCallBroadcaster.onCreate(), since there's no reason to
             // even bother with the NEW_OUTGOING_CALL broadcast if we're going
             // to disallow the outgoing call anyway...
-            if (TelephonyCapabilities.supportsOtasp(app.phone)) {
+            if (TelephonyCapabilities.supportsOtasp(phone)) {
                 boolean activateState = (app.cdmaOtaScreenState.otaScreenState
                         == OtaUtils.CdmaOtaScreenState.OtaScreenState.OTA_STATUS_ACTIVATION);
                 boolean dialogState = (app.cdmaOtaScreenState.otaScreenState
@@ -228,9 +248,9 @@ public class OutgoingCallBroadcaster extends Activity
             if (number == null) {
                 if (DBG) Log.v(TAG, "CALL cancelled (null number), returning...");
                 return false;
-            } else if (TelephonyCapabilities.supportsOtasp(app.phone)
-                    && (app.phone.getState() != PhoneConstants.State.IDLE)
-                    && (app.phone.isOtaSpNumber(number))) {
+            } else if (TelephonyCapabilities.supportsOtasp(phone)
+                    && (phone.getState() != PhoneConstants.State.IDLE)
+                    && (phone.isOtaSpNumber(number))) {
                 if (DBG) Log.v(TAG, "Call is active, a 2nd OTA call cancelled -- returning.");
                 return false;
             } else if (PhoneNumberUtils.isPotentialLocalEmergencyNumber(number, context)) {
@@ -263,7 +283,7 @@ public class OutgoingCallBroadcaster extends Activity
             if (VDBG) Log.v(TAG, "- uri: " + uri);
             if (VDBG) Log.v(TAG, "- actual number to dial: '" + number + "'");
 
-            startSipCallOptionHandler(context, intent, uri, number);
+            placeCall(context, intent, uri, number);
 
             return true;
         }
@@ -331,6 +351,29 @@ public class OutgoingCallBroadcaster extends Activity
         }
         context.startActivity(selectPhoneIntent);
         // ...and see SipCallOptionHandler.onCreate() for the next step of the sequence.
+    }
+
+    /**
+     * Called when we decide to place call through pstn with an subId if need.
+     * @param context
+     * @param intent
+     * @param uri
+     * @param number
+     */
+    private void placeCall(Context context, Intent intent,
+            Uri uri, String number) {
+        if (VDBG) {
+            Log.i(TAG, "placeCall...");
+            Log.i(TAG, "- intent: " + intent);
+            Log.i(TAG, "- uri: " + uri);
+            Log.i(TAG, "- number: " + number);
+        }
+        Intent newIntent = new Intent(Intent.ACTION_CALL, uri);
+        newIntent.putExtra(EXTRA_ACTUAL_NUMBER_TO_DIAL, number);
+        CallGatewayManager.checkAndCopyPhoneProviderExtras(intent, newIntent);
+        PhoneUtils.checkAndCopySubExtras(getApplicationContext(), intent, newIntent);
+
+        PhoneGlobals.getInstance().callController.placeCall(newIntent);
     }
 
     /**
@@ -597,6 +640,16 @@ public class OutgoingCallBroadcaster extends Activity
             }
         }
 
+        // If it is voice mail request, we should place call always after sub pick.
+        // we should do sub pick first to get right number according to the selected subId.
+        // PhoneNumberUtils.getNumberFromIntent() may use default subId to get number when lack of subId in intent,
+        // The voice mail number on default subId may be ECC, then we can't place call here.
+        Uri uri = intent.getData();
+        String scheme = uri.getScheme();
+        if (Constants.SCHEME_VOICEMAIL.equals(scheme)) {
+            callNow = false;
+        }
+
         if (callNow) {
             // This is a special kind of call (most likely an emergency number)
             // that 3rd parties aren't allowed to intercept or affect in any way.
@@ -614,36 +667,98 @@ public class OutgoingCallBroadcaster extends Activity
             // reaches the OutgoingCallReceiver, we'll know not to
             // initiate the call again because of the presence of the
             // EXTRA_ALREADY_CALLED extra.)
-        }
 
-        // For now, SIP calls will be processed directly without a
-        // NEW_OUTGOING_CALL broadcast.
-        //
-        // TODO: In the future, though, 3rd party apps *should* be allowed to
-        // intercept outgoing calls to SIP addresses as well.  To do this, we should
-        // (1) update the NEW_OUTGOING_CALL intent documentation to explain this
-        // case, and (2) pass the outgoing SIP address by *not* overloading the
-        // EXTRA_PHONE_NUMBER extra, but instead using a new separate extra to hold
-        // the outgoing SIP address.  (Be sure to document whether it's a URI or just
-        // a plain address, whether it could be a tel: URI, etc.)
+            if (Constants.SCHEME_SIP.equals(scheme) || PhoneNumberUtils.isUriNumber(number)) {
+                // For Sip call, do not send broadcast.
+                Log.i(TAG, "The requested number was detected as SIP call.");
+                finish();
+                return;
+            }
+
+            sendNewCallBroadcaster(intent, number, true);
+        } else {
+            // Check if user has assigned a valid subId, means user want to place call just through pstn using this subId;
+            // So just place call, skipping sub pick and sip-related handle.
+            long subId = intent.getLongExtra(PhoneConstants.SUB_ID_KEY, SubPickHandler.INVALID_SUB_ID);
+            if (PhoneUtils.isValidSubId(getApplicationContext(), subId)) {
+                sendNewCallBroadcaster(intent, number, false);
+                return;
+            }
+
+            boolean voipSupported = PhoneUtils.isVoipSupported();
+            SipProfileDb sipProfileDb = new SipProfileDb(getApplicationContext());
+            SipSharedPreferences sipSharedPreferences = new SipSharedPreferences(getApplicationContext());
+            String callOption = sipSharedPreferences.getSipCallOption();
+
+            boolean isRegularCall = Constants.SCHEME_TEL.equals(scheme)
+                    && !PhoneNumberUtils.isUriNumber(number);
+            boolean isInCellNetwork = isInCellNetwork();
+            boolean isNetworkConnected = isNetworkConnected(getApplicationContext());
+            boolean isKnownCallScheme = Constants.SCHEME_TEL.equals(scheme)
+                    || Constants.SCHEME_SIP.equals(scheme);
+
+            Log.d(TAG, "Call option: " + callOption);
+            Log.d(TAG, "voipSupported: " + voipSupported);
+            Log.d(TAG, "isRegularCall: " + isRegularCall);
+            Log.d(TAG, "isInCellNetwork: " + isInCellNetwork);
+            Log.d(TAG, "isNetworkConnected: " + isNetworkConnected);
+            Log.d(TAG, "isKnownCallScheme: " + isKnownCallScheme);
+
+            // if scheme is not tel and sip, will always do sub pick.
+            if (!isKnownCallScheme) {
+                doSubPick(this, intent, number, false);
+                return;
+            }
+
+            if (!voipSupported) {
+                if (!isRegularCall) {
+                    // pass to SipCallOptionHandler to handle this case.
+                    startSipCallOptionHandler(getApplicationContext(), intent, uri, number);
+                    startDelayedFinish();
+                    return;
+                } else {
+                    doSubPick(this, intent, number, false);
+                    return;
+                }
+            }
+
+            if (!isNetworkConnected) {
+                if (!isRegularCall) {
+                    // pass to SipCallOptionHandler to handle this case.
+                    startSipCallOptionHandler(getApplicationContext(), intent, uri, number);
+                    startDelayedFinish();
+                    return;
+                }
+            } else {
+                if (callOption.equals(Settings.System.SIP_ASK_ME_EACH_TIME)
+                        && isRegularCall && isInCellNetwork) {
+                    Log.d(TAG, "should show sip item when sim pcik! ");
+                    // indicate we should show INTERNET Call item when sub pick
+                    doSubPick(this, intent, number, true);
+                    return;
+                }
+                if (!callOption.equals(Settings.System.SIP_ADDRESS_ONLY)
+                        || !isRegularCall) {
+                    if ((sipProfileDb.getProfilesCount() > 0) || !isRegularCall) {
+                        startSipCallOptionHandler(getApplicationContext(), intent, uri, number);
+                        startDelayedFinish();
+                        return;
+                    }
+                }
+            }
+            doSubPick(this, intent, number, false);
+        }
+    }
+
+    private void sendNewCallBroadcaster(Intent intent, String number, boolean callNow) {
         Uri uri = intent.getData();
-        String scheme = uri.getScheme();
-        if (Constants.SCHEME_SIP.equals(scheme) || PhoneNumberUtils.isUriNumber(number)) {
-            Log.i(TAG, "The requested number was detected as SIP call.");
-            startSipCallOptionHandler(this, intent, uri, number);
-            finish();
-            return;
-
-            // TODO: if there's ever a way for SIP calls to trigger a
-            // "callNow=true" case (see above), we'll need to handle that
-            // case here too (most likely by just doing nothing at all.)
-        }
 
         Intent broadcastIntent = new Intent(Intent.ACTION_NEW_OUTGOING_CALL);
         if (number != null) {
             broadcastIntent.putExtra(Intent.EXTRA_PHONE_NUMBER, number);
         }
         CallGatewayManager.checkAndCopyPhoneProviderExtras(intent, broadcastIntent);
+        PhoneUtils.checkAndCopySubExtras(getApplicationContext(), intent, broadcastIntent);
         broadcastIntent.putExtra(EXTRA_ALREADY_CALLED, callNow);
         broadcastIntent.putExtra(EXTRA_ORIGINAL_URI, uri.toString());
         // Need to raise foreground in-call UI as soon as possible while allowing 3rd party app
@@ -744,5 +859,106 @@ public class OutgoingCallBroadcaster extends Activity
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         if (DBG) Log.v(TAG, "onConfigurationChanged: newConfig = " + newConfig);
+    }
+
+    private SubPickHandler mSubPickHandler;
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (isFinishing()) {
+            return;
+        }
+        if (mSubPickHandler != null) {
+            mSubPickHandler.dismissDialog();
+        }
+        finish();
+    }
+
+    @Override
+    public void onSubPickComplete(int completeKey, long subId, Intent intent) {
+        Log.d(TAG, "onSubPickComplete()... completeKey / subId: " + completeKey + " / " + subId);
+        String number = PhoneNumberUtils.getNumberFromIntent(intent, getApplicationContext());
+        if (number != null) {
+            if (!PhoneNumberUtils.isUriNumber(number)) {
+                number = PhoneNumberUtils.convertKeypadLettersToDigits(number);
+                number = PhoneNumberUtils.stripSeparators(number);
+            }
+        } else {
+            Log.w(TAG, "The number obtained from Intent is null.");
+        }
+        if (completeKey == SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB) {
+            // send NEW_OUTGOING_CALL broadcast after sub pick done if choose pstn to place the call.
+            intent.putExtra(PhoneConstants.SUB_ID_KEY, subId);
+            sendNewCallBroadcaster(intent, number, false);
+        } else if (completeKey == SubPickHandler.SUB_PICK_COMPLETE_KEY_SIP) {
+            // start SipCallOptionHandler to handle sip-related things after sub pick done if choose sip to place the call.
+            Uri uri = intent.getData();
+            startSipCallOptionHandler(getApplicationContext(), intent, uri, number);
+            startDelayedFinish();
+        }
+    }
+
+    private void doSubPick(Context context, Intent intent, String number, boolean withSipItem) {
+        // Check if we only have one choice, if is, skip sub pick and send NEW_OUTGOING_CALL broadcast directly
+        if (PhoneUtils.getSimCount() == 1 && !withSipItem) {
+            // If the project only have one sim, and there only one active sub, or no active sub at all, skip sub pick.
+            // If there has more than one active subs, should show sub pick also.
+            if (PhoneUtils.getActivatedSubInfoCount(context) == 0) {
+                sendNewCallBroadcaster(intent, number, false);
+                return;
+            } else if(PhoneUtils.getActivatedSubInfoCount(context) == 1) {
+                SubInfoRecord subInfoRecord = PhoneUtils.getFirstActiveSubInfoRecord(context);
+                intent.putExtra(PhoneConstants.SUB_ID_KEY, subInfoRecord.mSubId);
+                sendNewCallBroadcaster(intent, number, false);
+                return;
+            } else {
+                Log.i(TAG, "only one sim and more than one active subs, continue to handle sub pick.");
+            }
+        }
+
+        // Here, we need show sub pick dialog to user
+        List<SubPickItem> subPickItems = PhoneUtils.getSubPickItemList(context, withSipItem, true);
+        mSubPickHandler = new SubPickHandler(this, subPickItems);
+        mSubPickHandler.setSubPickListener(this);
+        long suggestedSubId = intent.getLongExtra(SubPickHandler.SUGGEST_SUB_ID_EXTRA, SubPickHandler.INVALID_SUB_ID);
+        mSubPickHandler.setSuggestedSubId(suggestedSubId);
+        mSubPickHandler.setIntent(intent);
+        String dialogTitle = getResources().getString(R.string.pick_outgoing_call_phone_type);
+        mSubPickHandler.showSubPickDialog(dialogTitle, false);
+    }
+    
+    /**
+     * Check whether the device is in pstn
+     * @return
+     */
+    public static boolean isInCellNetwork() {
+        boolean isInCellNetwork = false;
+        final Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        for (Phone phone : phones) {
+            if (phone.getServiceState().getVoiceRegState() != ServiceState.STATE_POWER_OFF) {
+                isInCellNetwork = true;
+                break;
+            }
+        }
+        return isInCellNetwork;
+    }
+
+    /**
+     * Check whether there has network connected on the device
+     * @param context
+     * @return
+     */
+    public static boolean isNetworkConnected(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(
+                Context.CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            NetworkInfo ni = cm.getActiveNetworkInfo();
+            if ((ni == null) || !ni.isConnected()) return false;
+
+            return ((ni.getType() == ConnectivityManager.TYPE_WIFI)
+                    || !SipManager.isSipWifiOnly(context));
+        }
+        return false;
     }
 }

@@ -133,7 +133,7 @@ public class OtaStartupReceiver extends BroadcastReceiver {
 
         // Delay OTA provisioning if network is not available yet
         PhoneGlobals app = PhoneGlobals.getInstance();
-        Phone phone = PhoneGlobals.getPhone();
+        Phone phone = app.mCM.getFgPhone();
         if (app.mCM.getServiceState() != ServiceState.STATE_IN_SERVICE) {
             if (DBG) Log.w(TAG, "Network is not ready. Registering to receive notification.");
             phone.registerForServiceStateChanged(mHandler, SERVICE_STATE_CHANGED, null);
