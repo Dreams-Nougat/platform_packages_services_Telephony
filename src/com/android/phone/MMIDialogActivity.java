@@ -43,8 +43,6 @@ public class MMIDialogActivity extends Activity {
     private Handler mHandler;
 
     private CallManager mCM = PhoneGlobals.getInstance().getCallManager();
-    private Phone mPhone = PhoneGlobals.getPhone();
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +68,7 @@ public class MMIDialogActivity extends Activity {
     }
 
     private void showMMIDialog() {
-        final List<? extends MmiCode> codes = mPhone.getPendingMmiCodes();
+        final List<? extends MmiCode> codes = mCM.getFgPhone().getPendingMmiCodes();
         if (codes.size() > 0) {
             final MmiCode mmiCode = codes.get(0);
             final Message message = Message.obtain(mHandler, PhoneGlobals.MMI_CANCEL);
@@ -89,9 +87,10 @@ public class MMIDialogActivity extends Activity {
         // PENDING.
 
         // if phone is a CDMA phone display feature code completed message
-        int phoneType = mPhone.getPhoneType();
+        final Phone phone = PhoneUtils.getPhoneUsingSub(mmiCode.getPhone().getSubscription());
+        final int phoneType = phone.getPhoneType();
         if (phoneType == PhoneConstants.PHONE_TYPE_CDMA) {
-            PhoneUtils.displayMMIComplete(mPhone, this, mmiCode, null, null);
+            PhoneUtils.displayMMIComplete(phone, this, mmiCode, null, null);
         } else if (phoneType == PhoneConstants.PHONE_TYPE_GSM) {
             if (mmiCode.getState() != MmiCode.State.PENDING) {
                 Log.d(TAG, "Got MMI_COMPLETE, finishing dialog activity...");
@@ -109,7 +108,7 @@ public class MMIDialogActivity extends Activity {
         Log.v(TAG, "onMMICancel()...");
 
         // First of all, cancel the outstanding MMI code (if possible.)
-        PhoneUtils.cancelMmiCode(mPhone);
+        PhoneUtils.cancelMmiCode(mCM.getFgPhone());
 
         // Regardless of whether the current MMI code was cancelable, the
         // PhoneApp will get an MMI_COMPLETE event very soon, which will

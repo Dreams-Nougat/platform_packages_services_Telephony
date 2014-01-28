@@ -58,7 +58,6 @@ public class CallHandlerServiceProxy extends Handler
     public static final int RETRY_DELAY_MILLIS = 2000;
     public static final int RETRY_DELAY_LONG_MILLIS = 30 * 1000; // 30 seconds
     private static final int BIND_RETRY_MSG = 1;
-    private static final int BIND_TIME_OUT = 2;
     private static final int MAX_SHORT_DELAY_RETRY_COUNT = 5;
 
     private AudioRouter mAudioRouter;
@@ -80,27 +79,7 @@ public class CallHandlerServiceProxy extends Handler
 
         switch (msg.what) {
             case BIND_RETRY_MSG:
-                // Remove any pending messages since we're already performing the action.
-                // If the call to setupServiceConnection() fails, it will queue up another retry.
-                removeMessages(BIND_RETRY_MSG);
                 handleConnectRetry();
-                break;
-            case BIND_TIME_OUT:
-                // Remove any pending messages since we're already performing the action.
-                // If the call to setupServiceConnection() fails, it will queue up another retry.
-                removeMessages(BIND_TIME_OUT);
-                synchronized (mServiceAndQueueLock) {
-                    if(mCallHandlerServiceGuarded == null) {
-                        Log.w(TAG, "Binding time out. InCallUI did not respond in time.");
-                        try {
-                            mContext.unbindService(mConnection);
-                        } catch(Exception e) {
-                            Log.w(TAG, "unbindservice exception", e);
-                        }
-                        mConnection = null;
-                        handleConnectRetry();
-                    }
-                }
                 break;
         }
     }
@@ -311,10 +290,6 @@ public class CallHandlerServiceProxy extends Handler
                 Log.d(TAG, "Service Connected");
             }
             onCallHandlerServiceConnected(ICallHandlerService.Stub.asInterface(service));
-            removeMessages(BIND_TIME_OUT);
-            if (DBG) {
-                Log.d(TAG, "Service Connected. Cancel timer");
-            }
             resetConnectRetryCount();
         }
 
@@ -415,9 +390,7 @@ public class CallHandlerServiceProxy extends Handler
 
                 if (failedConnection) {
                     mConnection = null;
-                    enqueueConnectRetry(BIND_RETRY_MSG);
-                } else {
-                    enqueueConnectRetry(BIND_TIME_OUT);
+                    enqueueConnectRetry();
                 }
             } else {
                 Log.d(TAG, "Service connection to in call service already started.");
@@ -439,6 +412,10 @@ public class CallHandlerServiceProxy extends Handler
     }
 
     private void handleConnectRetry() {
+        // Remove any pending messages since we're already performing the action.
+        // If the call to setupServiceConnection() fails, it will queue up another retry.
+        removeMessages(BIND_RETRY_MSG);
+
         // Something else triggered the connection, cancel.
         if (mConnection != null) {
             Log.i(TAG, "Retry: already connected.");
@@ -472,14 +449,14 @@ public class CallHandlerServiceProxy extends Handler
      * Called after the connection failed and a retry is needed.
      * Queues up a retry to happen with a delay.
      */
-    private void enqueueConnectRetry(int msg) {
+    private void enqueueConnectRetry() {
         final boolean isLongDelay = (mBindRetryCount > MAX_SHORT_DELAY_RETRY_COUNT);
         final int delay = isLongDelay ? RETRY_DELAY_LONG_MILLIS : RETRY_DELAY_MILLIS;
 
         Log.w(TAG, "InCallUI Connection failed. Enqueuing delayed retry for " + delay + " ms." +
                 " retries(" + mBindRetryCount + ")");
 
-        sendEmptyMessageDelayed(msg, delay);
+        sendEmptyMessageDelayed(BIND_RETRY_MSG, delay);
     }
 
     private void unbind() {

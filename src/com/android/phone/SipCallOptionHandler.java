@@ -68,12 +68,11 @@ public class SipCallOptionHandler extends Activity implements
     private static final boolean DBG =
             (PhoneGlobals.DBG_LEVEL >= 1) && (SystemProperties.getInt("ro.debuggable", 0) == 1);
 
-    static final int DIALOG_SELECT_PHONE_TYPE = 0;
-    static final int DIALOG_SELECT_OUTGOING_SIP_PHONE = 1;
-    static final int DIALOG_START_SIP_SETTINGS = 2;
-    static final int DIALOG_NO_INTERNET_ERROR = 3;
-    static final int DIALOG_NO_VOIP = 4;
-    static final int DIALOG_SIZE = 5;
+    static final int DIALOG_SELECT_OUTGOING_SIP_PHONE = 0;
+    static final int DIALOG_START_SIP_SETTINGS = 1;
+    static final int DIALOG_NO_INTERNET_ERROR = 2;
+    static final int DIALOG_NO_VOIP = 3;
+    static final int DIALOG_SIZE = 4;
 
     private Intent mIntent;
     private List<SipProfile> mProfileList;
@@ -84,7 +83,6 @@ public class SipCallOptionHandler extends Activity implements
     private Dialog[] mDialogs = new Dialog[DIALOG_SIZE];
     private SipProfile mOutgoingSipProfile;
     private TextView mUnsetPriamryHint;
-    private boolean mUseSipPhone = false;
     private boolean mMakePrimary = false;
 
     private static final int EVENT_DELAYED_FINISH = 1;
@@ -164,15 +162,15 @@ public class SipCallOptionHandler extends Activity implements
         Uri uri = mIntent.getData();
         String scheme = uri.getScheme();
         mNumber = PhoneNumberUtils.getNumberFromIntent(mIntent, this);
-        boolean isInCellNetwork = PhoneGlobals.getInstance().phoneMgr.isRadioOn();
         boolean isKnownCallScheme = Constants.SCHEME_TEL.equals(scheme)
                 || Constants.SCHEME_SIP.equals(scheme);
         boolean isRegularCall = Constants.SCHEME_TEL.equals(scheme)
                 && !PhoneNumberUtils.isUriNumber(mNumber);
 
         // Bypass the handler if the call scheme is not sip or tel.
+        // Actually, SubPickHandler will do scheme check, only sip or tel can reach here.
         if (!isKnownCallScheme) {
-            setResultAndFinish();
+            startDelayedFinish();
             return;
         }
 
@@ -180,49 +178,20 @@ public class SipCallOptionHandler extends Activity implements
         if (!voipSupported) {
             if (!isRegularCall) {
                 showDialog(DIALOG_NO_VOIP);
-            } else {
-                setResultAndFinish();
             }
             return;
         }
 
-        // Since we are not sure if anyone has touched the number during
-        // the NEW_OUTGOING_CALL broadcast, we just check if the provider
-        // put their gateway information in the intent. If so, it means
-        // someone has changed the destination number. We then make the
-        // call via the default pstn network. However, if one just alters
-        // the destination directly, then we still let it go through the
-        // Internet call option process.
-        if (!CallGatewayManager.hasPhoneProviderExtras(mIntent)) {
-            if (!isNetworkConnected()) {
-                if (!isRegularCall) {
-                    showDialog(DIALOG_NO_INTERNET_ERROR);
-                    return;
-                }
-            } else {
-                if (mCallOption.equals(Settings.System.SIP_ASK_ME_EACH_TIME)
-                        && isRegularCall && isInCellNetwork) {
-                    showDialog(DIALOG_SELECT_PHONE_TYPE);
-                    return;
-                }
-                if (!mCallOption.equals(Settings.System.SIP_ADDRESS_ONLY)
-                        || !isRegularCall) {
-                    mUseSipPhone = true;
-                }
+        // Check if network is connected.
+        if (!isNetworkConnected()) {
+            if (!isRegularCall) {
+                showDialog(DIALOG_NO_INTERNET_ERROR);
+                return;
             }
         }
 
-        if (mUseSipPhone) {
-            // If there is no sip profile and it is a regular call, then we
-            // should use pstn network instead.
-            if ((mSipProfileDb.getProfilesCount() > 0) || !isRegularCall) {
-                startGetPrimarySipPhoneThread();
-                return;
-            } else {
-                mUseSipPhone = false;
-            }
-        }
-        setResultAndFinish();
+        // Finally, do sip-related operations.
+        startGetPrimarySipPhoneThread();
     }
 
     /**
@@ -246,15 +215,6 @@ public class SipCallOptionHandler extends Activity implements
     protected Dialog onCreateDialog(int id) {
         Dialog dialog;
         switch(id) {
-        case DIALOG_SELECT_PHONE_TYPE:
-            dialog = new AlertDialog.Builder(this)
-                    .setTitle(R.string.pick_outgoing_call_phone_type)
-                    .setIconAttribute(android.R.attr.alertDialogIcon)
-                    .setSingleChoiceItems(R.array.phone_type_values, -1, this)
-                    .setNegativeButton(android.R.string.cancel, this)
-                    .setOnCancelListener(this)
-                    .create();
-            break;
         case DIALOG_SELECT_OUTGOING_SIP_PHONE:
             dialog = new AlertDialog.Builder(this)
                     .setTitle(R.string.pick_outgoing_sip_phone)
@@ -334,15 +294,6 @@ public class SipCallOptionHandler extends Activity implements
             // button negative is cancel
             finish();
             return;
-        } else if(dialog == mDialogs[DIALOG_SELECT_PHONE_TYPE]) {
-            String selection = getResources().getStringArray(
-                    R.array.phone_type_values)[id];
-            if (DBG) Log.v(TAG, "User pick phone " + selection);
-            if (selection.equals(getString(R.string.internet_phone))) {
-                mUseSipPhone = true;
-                startGetPrimarySipPhoneThread();
-                return;
-            }
         } else if (dialog == mDialogs[DIALOG_SELECT_OUTGOING_SIP_PHONE]) {
             mOutgoingSipProfile = mProfileList.get(id);
         } else if ((dialog == mDialogs[DIALOG_NO_INTERNET_ERROR])
@@ -412,7 +363,7 @@ public class SipCallOptionHandler extends Activity implements
                     }
                 }
 
-                if (mUseSipPhone && mOutgoingSipProfile == null) {
+                if (mOutgoingSipProfile == null) {
                     showDialog(DIALOG_START_SIP_SETTINGS);
                     return;
                 } else {

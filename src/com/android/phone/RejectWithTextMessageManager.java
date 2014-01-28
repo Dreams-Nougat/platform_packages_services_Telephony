@@ -143,7 +143,7 @@ public class RejectWithTextMessageManager {
     /**
      * Reject the call with the specified message. If message is null this call is ignored.
      */
-    public static void rejectCallWithMessage(String phoneNumber, String message) {
+    public static void rejectCallWithMessage(String phoneNumber, String message, long subId) {
         if (message != null) {
             final ComponentName component =
                     SmsApplication.getDefaultRespondViaMessageApplication(
@@ -155,6 +155,8 @@ public class RejectWithTextMessageManager {
                 intent.putExtra(Intent.EXTRA_TEXT, message);
                 showMessageSentToast(phoneNumber);
                 intent.setComponent(component);
+                log("rejectCallWithMessage, subId = " + subId);
+                intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, subId);
                 PhoneGlobals.getInstance().startService(intent);
             }
         }

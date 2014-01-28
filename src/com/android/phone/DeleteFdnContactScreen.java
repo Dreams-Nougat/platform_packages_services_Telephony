@@ -16,6 +16,8 @@
 
 package com.android.phone;
 
+import com.android.internal.telephony.PhoneConstants;
+
 import android.app.Activity;
 import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
@@ -24,6 +26,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Window;
@@ -51,6 +54,7 @@ public class DeleteFdnContactScreen extends Activity {
     protected QueryHandler mQueryHandler;
 
     private Handler mHandler = new Handler();
+    private long mSubId = SubscriptionManager.SIM_NOT_INSERTED;
 
     @Override
     protected void onCreate(Bundle icicle) {
@@ -91,7 +95,8 @@ public class DeleteFdnContactScreen extends Activity {
 
         mName =  intent.getStringExtra(INTENT_EXTRA_NAME);
         mNumber =  intent.getStringExtra(INTENT_EXTRA_NUMBER);
-
+        mSubId = intent.getLongExtra(
+                PhoneConstants.SUBSCRIPTION_KEY, SubscriptionManager.SIM_NOT_INSERTED);
         if (TextUtils.isEmpty(mNumber)) {
             finish();
         }
@@ -111,7 +116,7 @@ public class DeleteFdnContactScreen extends Activity {
         buf.append(mPin2);
         buf.append("'");
 
-        Uri uri = Uri.parse("content://icc/fdn");
+        Uri uri = Uri.parse("content://icc/fdn" + mSubId);
 
         mQueryHandler = new QueryHandler(getContentResolver());
         mQueryHandler.startDelete(0, null, uri, buf.toString(), null);

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!--  Copyright (C) 2007 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,40 +25,19 @@
     <string name="private_num" msgid="6713286113000232309">"Прыватны нумар"</string>
     <string name="payphone" msgid="1931775086311769314">"Таксафон"</string>
     <string name="onHold" msgid="9035493194749959955">"У чаканні"</string>
-    <string name="callFailed_userBusy" msgid="8851106999809294904">"Лінія занятая"</string>
-    <string name="callFailed_congestion" msgid="8737761615702718375">"Сетка занятая"</string>
-    <string name="callFailed_timedOut" msgid="7590961703135543346">"Няма адказу, тайм-аўт"</string>
-    <string name="callFailed_server_unreachable" msgid="2133506577423869729">"Сервер недаступны"</string>
-    <string name="callFailed_number_unreachable" msgid="7632566442515734778">"Колькасць недаступная"</string>
-    <string name="callFailed_invalid_credentials" msgid="8226835346196775378">"Няправільнае імя ці пароль"</string>
-    <string name="callFailed_out_of_network" msgid="8740943329772180507">"Выклік з-за межаў сеткі"</string>
-    <string name="callFailed_server_error" msgid="5717915213586193217">"Памылка сервера. Паспрабуйце пазней."</string>
-    <string name="callFailed_noSignal" msgid="1889803273616031933">"Няма сігналу"</string>
-    <string name="callFailed_limitExceeded" msgid="4958065157970101491">"Ліміт ACM перавышаны"</string>
-    <string name="callFailed_powerOff" msgid="2766035859391549713">"Радыё выключанае"</string>
-    <string name="callFailed_simError" msgid="4476360200030635828">"Няма SIM-карты або памылка яе чытання"</string>
-    <string name="callFailed_outOfService" msgid="4825791466557236225">"Па-за зонай абслугоўвання"</string>
-    <string name="callFailed_fdn_only" msgid="2850204579765430641">"Выходныя выклікі абмежаваныя FDN."</string>
-    <string name="callFailed_cb_enabled" msgid="3686963693629739680">"Вы не можаце рабіць выходныя выклікi, калі ўключана забарона выклікаў."</string>
-    <string name="callFailed_dsac_restricted" msgid="2180223622768522345">"Усе выклікі абмежаваныя кантролем доступу."</string>
-    <string name="callFailed_dsac_restricted_emergency" msgid="4353654268813314466">"Экстраныя выклікі абмежаваныя кантролем доступу."</string>
-    <string name="callFailed_dsac_restricted_normal" msgid="2680774510252408620">"Звычайныя выклікі абмежаваныя кантролем доступу."</string>
-    <string name="callFailed_unobtainable_number" msgid="4736290912891155067">"Несапраўдны нумар"</string>
-    <string name="confCall" msgid="1904840547188336828">"Канферэнц-выклік"</string>
-    <string name="call_lost" msgid="317670617901479594">"Выклік быў страчаны."</string>
-    <string name="ok" msgid="3811371167865772377">"ОК"</string>
     <string name="mmiStarted" msgid="6347869857061147003">"Пачалося выкананне MMI кода"</string>
     <string name="ussdRunning" msgid="485588686340541690">"Запускаецца USSD-код..."</string>
     <string name="mmiCancelled" msgid="2771923949751842276">"Код MMI адменены"</string>
     <string name="cancel" msgid="5044513931633602634">"Адмяніць"</string>
     <string name="enter_input" msgid="1810529547726803893">"Паведамленне USSD павінна складацца з наступнай колькасцi знакаў:  ад <xliff:g id="MIN_LEN">%d</xliff:g> да <xliff:g id="MAX_LEN">%d</xliff:g>. Паспрабуйце яшчэ раз."</string>
     <string name="manageConferenceLabel" msgid="4691922394301969053">"Кіраванне канферэнц-выклікам"</string>
+    <string name="ok" msgid="3811371167865772377">"ОК"</string>
     <string name="audio_mode_speaker" msgid="27649582100085266">"Дынамік"</string>
     <string name="audio_mode_earpiece" msgid="4156527186373869107">"Дынамік тэлефона"</string>
     <string name="audio_mode_wired_headset" msgid="1465350758489175975">"Правадная гарнітура"</string>
     <string name="audio_mode_bluetooth" msgid="3047641300848211128">"Bluetooth"</string>
-    <string name="wait_prompt_str" msgid="7601815427707856238">"Адправіць наступныя тоны?"\n</string>
-    <string name="pause_prompt_str" msgid="1789964702154314806">"Адпраўка сігналаў"\n</string>
+    <string name="wait_prompt_str" msgid="7601815427707856238">"Адправіць наступныя тоны?\n"</string>
+    <string name="pause_prompt_str" msgid="1789964702154314806">"Адпраўка сігналаў\n"</string>
     <string name="send_button" msgid="4106860097497818751">"Адправіць"</string>
     <string name="pause_prompt_yes" msgid="3564467212025151797">"Так"</string>
     <string name="pause_prompt_no" msgid="6686238803236884877">"Не"</string>
@@ -136,9 +115,9 @@
     <item msgid="1108394741608734023">"Паказаць нумар"</item>
   </string-array>
     <string name="vm_changed" msgid="380744030726254139">"Нумар галасавой пошты змяніўся."</string>
-    <string name="vm_change_failed" msgid="3352934863246208918">"Не атрымалася змяніць нумар галасавой пошты."\n"Калі праблема не вырашыцца, звярніцеся да свайго аператара."</string>
-    <string name="fw_change_failed" msgid="5298103228470214665">"Не атрымалася змяніць нумар для пераадрасацыi."\n"Калі гэтая праблема не вырашыцца, звярніцеся да свайго аператара."</string>
-    <string name="fw_get_in_vm_failed" msgid="8862896836093833973">"Немагчыма атрымаць і захаваць бягучыя налады пераадрасацыі нумару."\n"Усё роўна пераключыць на новага пастаўшчыка?"</string>
+    <string name="vm_change_failed" msgid="3352934863246208918">"Не атрымалася змяніць нумар галасавой пошты.\nКалі праблема не вырашыцца, звярніцеся да свайго аператара."</string>
+    <string name="fw_change_failed" msgid="5298103228470214665">"Не атрымалася змяніць нумар для пераадрасацыi.\nКалі гэтая праблема не вырашыцца, звярніцеся да свайго аператара."</string>
+    <string name="fw_get_in_vm_failed" msgid="8862896836093833973">"Немагчыма атрымаць і захаваць бягучыя налады пераадрасацыі нумару.\nУсё роўна пераключыць на новага пастаўшчыка?"</string>
     <string name="no_change" msgid="3186040086622435212">"Змены не выкананы."</string>
     <string name="sum_voicemail_choose_provider" msgid="59911196126278922">"Выберыце службу галасавой пошты"</string>
     <string name="voicemail_default" msgid="5902099213882352338">"Мой аператар"</string>
@@ -157,9 +136,11 @@
     <string name="select_automatically" msgid="5628402124471810174">"Выбраць аўтаматычна"</string>
     <string name="sum_select_automatically" msgid="5614890115123292400">"Аўтаматычна выбраць прыярытэтную сетку"</string>
     <string name="register_automatically" msgid="6017849844573519637">"Аўтаматычная рэгістрацыя..."</string>
-    <string name="preferred_network_mode_title" msgid="8873246565334559308">"Сеткавы рэжым"</string>
+    <!-- no translation found for preferred_network_mode_title (2336624679902659306) -->
+    <skip />
     <string name="preferred_network_mode_summary" msgid="1434820673166126609">"Змяніць рэжым работы сеткі"</string>
-    <string name="preferred_network_mode_dialogtitle" msgid="8176355237105593793">"Пераважны сеткавы рэжым"</string>
+    <!-- no translation found for preferred_network_mode_dialogtitle (4048082093347807230) -->
+    <skip />
     <string name="preferred_network_mode_wcdma_perf_summary" msgid="8521677230113533809">"Пераважны рэжым сеткі: пераважна WCDMA"</string>
     <string name="preferred_network_mode_gsm_only_summary" msgid="3352445413437453511">"Пераважны рэжым сеткі: толькі GSM"</string>
     <string name="preferred_network_mode_wcdma_only_summary" msgid="2836897236221063413">"Пераважны рэжым сеткі: толькі WCDMA"</string>
@@ -203,10 +184,10 @@
     <string name="throttle_time_frame" msgid="1915198770363734685">"Перыяд выкарыстання дадзеных"</string>
     <string name="throttle_rate" msgid="4710388992676803508">"Палітыка хуткасці перадачы дадзеных"</string>
     <string name="throttle_help" msgid="243651091785169900">"Дадатковая iнфармацыя"</string>
-    <string name="throttle_status_subtext" msgid="1657318943142085170">"Выкарыстана <xliff:g id="USED_0">%1$s</xliff:g> (<xliff:g id="USED_1">%2$d</xliff:g>??) з максімуму перыяду <xliff:g id="USED_2">%3$s</xliff:g>"\n"Наступны перыяд пачнецца праз <xliff:g id="USED_3">%4$d</xliff:g> д. (<xliff:g id="USED_4">%5$s</xliff:g>)"</string>
+    <string name="throttle_status_subtext" msgid="1657318943142085170">"Выкарыстана <xliff:g id="USED_0">%1$s</xliff:g> (<xliff:g id="USED_1">%2$d</xliff:g>??) з максімуму перыяду <xliff:g id="USED_2">%3$s</xliff:g>\nНаступны перыяд пачнецца праз <xliff:g id="USED_3">%4$d</xliff:g> д. (<xliff:g id="USED_4">%5$s</xliff:g>)"</string>
     <string name="throttle_data_usage_subtext" msgid="6029276011123694701">"Выкарыстана <xliff:g id="USED_0">%1$s</xliff:g> (<xliff:g id="USED_1">%2$d</xliff:g>??) з максімуму перыяду (<xliff:g id="USED_2">%3$s</xliff:g>)"</string>
-    <string name="throttle_data_rate_reduced_subtext" msgid="7492763592720107737">"Максімум <xliff:g id="USED_0">%1$s</xliff:g> перавышаны"\n"Хуткасць перадачы дадзеных зніжана да <xliff:g id="USED_1">%2$d</xliff:g> Кб/с"</string>
-    <string name="throttle_time_frame_subtext" msgid="7732763021560399960">"<xliff:g id="USED_0">%1$d</xliff:g>?? цыклу прайшло"\n"Наступны перыяд пачнецца праз <xliff:g id="USED_1">%2$d</xliff:g> д. (<xliff:g id="USED_2">%3$s</xliff:g>)"</string>
+    <string name="throttle_data_rate_reduced_subtext" msgid="7492763592720107737">"Максімум <xliff:g id="USED_0">%1$s</xliff:g> перавышаны\nХуткасць перадачы дадзеных зніжана да <xliff:g id="USED_1">%2$d</xliff:g> Кб/с"</string>
+    <string name="throttle_time_frame_subtext" msgid="7732763021560399960">"<xliff:g id="USED_0">%1$d</xliff:g>?? цыклу прайшло\nНаступны перыяд пачнецца праз <xliff:g id="USED_1">%2$d</xliff:g> д. (<xliff:g id="USED_2">%3$s</xliff:g>)"</string>
     <string name="throttle_rate_subtext" msgid="2149102656120726855">"Хуткасць перадачы дадзеных зніжаецца да <xliff:g id="USED">%1$d</xliff:g> Кб/с, калі абмежаванне выкарыстання дадзеных перавышанае"</string>
     <string name="throttle_help_subtext" msgid="5217706521499010816">"Больш падрабязная інфармацыя аб палітыцы выкарыстання дадзеных у сетцы вашага мабільнага аператара"</string>
     <string name="cell_broadcast_sms" msgid="5584192824053625842">"Перадача SMS на сотавыя"</string>
@@ -296,8 +277,12 @@
     <string name="enable_disable_multi_category" msgid="626771003122899280">"Мульці-катэгорыя"</string>
     <string name="multi_category_enable" msgid="1179299804641721768">"Мульці-катэгорыя ўключана"</string>
     <string name="multi_category_disable" msgid="880104702904139505">"Мульці-катэгорыя адключаная"</string>
-    <string name="prefer_2g" msgid="8442550937280449639">"Карыстацца толькі сеткамі 2G"</string>
-    <string name="prefer_2g_summary" msgid="1976491403210690759">"Эканоміць батарэю"</string>
+    <!-- no translation found for network_lte (7702681952521375754) -->
+    <skip />
+    <!-- no translation found for network_4G (2723512640529983138) -->
+    <skip />
+    <!-- no translation found for network_global (1323190488685355309) -->
+    <skip />
     <string name="cdma_system_select_title" msgid="5757657769327732833">"Выбар сістэмы"</string>
     <string name="cdma_system_select_summary" msgid="60460043745797517">"Змяніць рэжым роўмінгу CDMA"</string>
     <string name="cdma_system_select_dialogtitle" msgid="6083355415165359075">"Выбар сістэмы"</string>
@@ -318,6 +303,8 @@
   </string-array>
     <string name="cdma_activate_device" msgid="3793805892364814518">"Актывацыя прылады"</string>
     <string name="cdma_lte_data_service" msgid="4255018217292548962">"Налады службы перад. дадзеных"</string>
+    <!-- no translation found for carrier_settings_title (9028166176523012300) -->
+    <skip />
     <string name="fdn" msgid="7878832555095183202">"Фіксаваныя нумары"</string>
     <string name="manage_fdn_list" msgid="8777755791892122369">"Спіс FDN"</string>
     <string name="fdn_activation" msgid="2156479741307463576">"Актывацыя FDN"</string>
@@ -356,6 +343,8 @@
     <string name="pin2_invalid" msgid="5470854099230755944">"FDN не быў абноўлены, таму што вы набралі няправільны PIN-код."</string>
     <string name="fdn_invalid_number" msgid="1494755047900009147">"FDN не абноўлены, таму што нумар не можа бвць больш за 20 знакаў."</string>
     <string name="pin2_or_fdn_invalid" msgid="6025144083384701197">"Cпiс дазволеных нумароў не адноўлены. PIN2 ўведзены няправiльна, або нумар быў адхiлены."</string>
+    <!-- no translation found for fdn_failed (540018079008319747) -->
+    <skip />
     <string name="simContacts_emptyLoading" msgid="2203331234764498011">"Чытанне з SIM-карты..."</string>
     <string name="simContacts_empty" msgid="5270660846489561932">"На вашай SIM-карце няма кантактаў."</string>
     <string name="simContacts_title" msgid="1861472842524839921">"Выберыце кантакты для імпарту"</string>
@@ -376,7 +365,8 @@
     <string name="disable_pin_ok" msgid="5596999379593924850">"PIN-код SIM-карты адключаны."</string>
     <string name="pin_failed" msgid="2298841192582192277">"Вы набралі няправільны PIN-код."</string>
     <string name="pin_changed" msgid="4365538014588501049">"PIN-код SIM-карты паспяхова зменены."</string>
-    <string name="puk_requested" msgid="3898394204193202803">"Пароль няправільны, SIM заблакаваная! Патрабуецца PUK2."</string>
+    <!-- no translation found for puk_requested (1796577128488773946) -->
+    <skip />
     <string name="enter_pin2_text" msgid="8339444124477720345">"PIN2"</string>
     <string name="oldPin2Label" msgid="8559146795026261502">"Стары PIN2"</string>
     <string name="newPin2Label" msgid="4573956902204349054">"Новы PIN2"</string>
@@ -388,8 +378,15 @@
     <string name="invalidPuk2" msgid="1290977391033057871">"Увядзіце PUK2, які складаецца з 8 лічбаў."</string>
     <string name="pin2_changed" msgid="1639666438836544393">"Код PIN2 паспяхова зменены."</string>
     <string name="label_puk2_code" msgid="302845876240219560">"Увядзіце PUK2-код"</string>
-    <string name="fdn_enable_puk2_requested" msgid="4262894949634885773">"Няправільны пароль. Змяніце код PIN2 і паспрабуйце яшчэ раз."</string>
+    <!-- no translation found for fdn_enable_puk2_requested (3674058967950559397) -->
+    <skip />
     <string name="puk2_requested" msgid="8909278021238716877">"Няправiльны пароль. SIM-карта заблакавана. Патрабуецца код PUK2."</string>
+    <!-- no translation found for puk2_blocked (3150263853077280049) -->
+    <skip />
+    <!-- no translation found for pin2_attempts (7937503107162525324) -->
+    <skip />
+    <!-- no translation found for pin2_unblocked (2903147240919055381) -->
+    <skip />
     <string name="doneButton" msgid="2859593360997984240">"Гатова"</string>
     <string name="caller_manage_header" msgid="3231519674734638786">"Канферэнц-выклік <xliff:g id="CONF_CALL_TIME">%s</xliff:g>"</string>
     <string name="voicemail_settings_number_label" msgid="8524164258691887790">"Нумар галасавой пошты"</string>
@@ -470,7 +467,11 @@
   </string-array>
     <string name="network_message" msgid="4483886461245213802">"Паведамленне сеткі"</string>
     <string name="ota_title_activate" msgid="8616918561356194398">"Актываваць тэлефон"</string>
-    <string name="ota_touch_activate" msgid="6553212803262586244">"Каб актываваць абслугоўванне вашага тэлефона, трэба выканаць спецыяльны выклік. "\n\n"Націсніце \"Актываваць\" і слухайце інструкцыі, неабходныя для актывацыі тэлефона."</string>
+    <string name="ota_touch_activate" msgid="6553212803262586244">"Каб актываваць абслугоўванне вашага тэлефона, трэба выканаць спецыяльны выклік. \n\nНацісніце \"Актываваць\" і слухайце інструкцыі, неабходныя для актывацыі тэлефона."</string>
+    <!-- no translation found for ota_hfa_activation_title (2234246934160473981) -->
+    <skip />
+    <!-- no translation found for ota_hfa_activation_dialog_message (8092479227918463415) -->
+    <skip />
     <string name="ota_skip_activation_dialog_title" msgid="2943366608272261306">"Прапусціць актывацыю?"</string>
     <string name="ota_skip_activation_dialog_message" msgid="2440770373498870550">"Калі прапусціць актывацыю, вы не зможаце здзяйсняць званкі або падлучэнні да мабільных сетак перадачы дадзеных (хаця вы зможаце падлучыцца да Wi-Fi). Кожны раз пры ўключэнні тэлефона вам будзе прапанавана актываваць яго."</string>
     <string name="ota_skip_activation_dialog_skip_label" msgid="3458532775091563208">"Прапусціць"</string>
@@ -482,7 +483,7 @@
     <string name="ota_progress" msgid="3420314892609254729">"Пачакайце, пакуль ваш тэлефон праграмуецца."</string>
     <string name="ota_failure" msgid="4311299546379674378">"Няўдалае праграмаванне"</string>
     <string name="ota_successful" msgid="1880780692887077407">"Цяпер тэлефон актываваны. Запуск службы можа заняць да 15 хвілін."</string>
-    <string name="ota_unsuccessful" msgid="8072141612635635357">"Ваш тэлефон не актываваны. "\n"Магчыма, вам спатрэбіцца знайсці вобласць з лепшым пакрыццём (каля акна ці на вуліцы). "\n\n"Паўтарыце спробу ці звярнiцеся ў цэнтр абслугоўвання кліентаў, каб атрымаць дадатковую інфармацыю."</string>
+    <string name="ota_unsuccessful" msgid="8072141612635635357">"Ваш тэлефон не актываваны. \nМагчыма, вам спатрэбіцца знайсці вобласць з лепшым пакрыццём (каля акна ці на вуліцы). \n\nПаўтарыце спробу ці звярнiцеся ў цэнтр абслугоўвання кліентаў, каб атрымаць дадатковую інфармацыю."</string>
     <string name="ota_spc_failure" msgid="3909983542575030796">"ПАМЫЛКІ ПЕРАВЫШЭННЯ SPC"</string>
     <string name="ota_call_end" msgid="4537279738134612388">"Назад"</string>
     <string name="ota_try_again" msgid="7685477206465902290">"Паспрабаваць яшчэ раз"</string>
@@ -598,7 +599,8 @@
     <string name="respond_via_sms_setting_title_2" msgid="6104662227299493906">"Рэдагаваць хуткія адказы"</string>
     <string name="respond_via_sms_setting_summary" msgid="9150281183930613065"></string>
     <string name="respond_via_sms_edittext_dialog_title" msgid="20379890418289778">"Хуткі адказ"</string>
-    <string name="respond_via_sms_menu_reset_default_activity" msgid="1461742052902053466">"Скінуць налады прыкладання"</string>
+    <!-- no translation found for respond_via_sms_menu_reset_default_activity (4029277930090150223) -->
+    <skip />
     <string name="respond_via_sms_confirmation_format" msgid="7229149977515784269">"Паведамленне адпраўлена на нумар <xliff:g id="PHONE_NUMBER">%s</xliff:g>."</string>
     <string name="description_image_button_one" msgid="5502718871331943463">"адзін"</string>
     <string name="description_image_button_two" msgid="4903738528222924522">"два"</string>

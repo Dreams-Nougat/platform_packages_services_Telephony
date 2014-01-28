@@ -33,12 +33,16 @@ import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceGroup;
 import android.preference.PreferenceScreen;
+import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.OperatorInfo;
+import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.widget.SubscriptionView;
+import com.android.phone.SubPickHandler.SubPickListener;
 
 import java.util.HashMap;
 import java.util.List;
@@ -46,8 +50,8 @@ import java.util.List;
 /**
  * "Networks" settings UI for the Phone app.
  */
-public class NetworkSetting extends PreferenceActivity
-        implements DialogInterface.OnCancelListener {
+public class NetworkSetting extends PreferenceActivity implements
+         DialogInterface.OnCancelListener, PhoneGlobals.SimInfoUpdateListener, SubPickListener {
 
     private static final String LOG_TAG = "phone";
     private static final boolean DBG = false;
@@ -70,6 +74,7 @@ public class NetworkSetting extends PreferenceActivity
     private HashMap<Preference, OperatorInfo> mNetworkMap;
 
     Phone mPhone;
+    private long mSubId = SubscriptionManager.SIM_NOT_INSERTED;
     protected boolean mIsForeground = false;
 
     /** message for network selection */
@@ -226,8 +231,30 @@ public class NetworkSetting extends PreferenceActivity
 
         addPreferencesFromResource(R.xml.carrier_select);
 
-        mPhone = PhoneGlobals.getPhone();
+        doSubPick();
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
+    }
 
+    private void doSubPick() {
+        if (PhoneUtils.getActivatedSubInfoCount(this) == 1) {
+            final long subId = PhoneUtils.getFirstActiveSubInfoRecord(this).mSubId;
+            onSubPickComplete(SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB, subId, null);
+        } else if (getIntent().hasExtra(PhoneConstants.SUBSCRIPTION_KEY)) {
+            final long subId = getIntent().getLongExtra(PhoneConstants.SUBSCRIPTION_KEY,
+                    SubPickHandler.INVALID_SUB_ID);
+            onSubPickComplete(SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB, subId, null);
+        } else if (SubscriptionManager.getAllSubInfoCount(this) > 1) {
+            final SubPickHandler subPickHandler = new SubPickHandler(this,
+                    SubPickHandler.getSubPickItemList(this, false, false));
+            subPickHandler.setSubPickListener(this);
+            subPickHandler.setSubViewThemeType(SubscriptionView.DARK_THEME);
+            subPickHandler.showSubPickDialog(getPreferenceScreen().getTitle().toString(), true);
+        } else {
+            finish();
+        }
+    }
+
+    private void init() {
         mNetworkList = (PreferenceGroup) getPreferenceScreen().findPreference(LIST_NETWORKS_KEY);
         mNetworkMap = new HashMap<Preference, OperatorInfo>();
 
@@ -236,12 +263,14 @@ public class NetworkSetting extends PreferenceActivity
 
         // Start the Network Query service, and bind it.
         // The OS knows to start he service only once and keep the instance around (so
-        // long as startService is called) until a stopservice request is made.  Since
+        // long as startService is called) until a stopService request is made.  Since
         // we want this service to just stay in the background until it is killed, we
         // don't bother stopping it from our end.
-        startService (new Intent(this, NetworkQueryService.class));
-        bindService (new Intent(this, NetworkQueryService.class), mNetworkQueryServiceConnection,
-                Context.BIND_AUTO_CREATE);
+        Intent intent = new Intent(this, NetworkQueryService.class);
+        intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, mSubId);
+        startService (intent);
+        bindService (new Intent(this, NetworkQueryService.class),
+                mNetworkQueryServiceConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
@@ -263,9 +292,12 @@ public class NetworkSetting extends PreferenceActivity
     @Override
     protected void onDestroy() {
         // unbind the service.
-        unbindService(mNetworkQueryServiceConnection);
+        if (mNetworkQueryService != null) {
+            unbindService(mNetworkQueryServiceConnection);
+        }
 
         super.onDestroy();
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
     }
 
     @Override
@@ -472,7 +504,27 @@ public class NetworkSetting extends PreferenceActivity
         mPhone.setNetworkSelectionModeAutomatic(msg);
     }
 
+    @Override
+    public void handleSimInfoUpdate() {
+        finish();
+    }
+
     private void log(String msg) {
         Log.d(LOG_TAG, "[NetworksList] " + msg);
+    }
+
+    @Override
+    public void onSubPickComplete(int completeKey, long subId, Intent intent) {
+        log("onSubPickComplete, completeKey = " + completeKey +
+                "; subId = " + subId);
+        if (PhoneUtils.isValidSubId(subId)) {
+            if (SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB == completeKey) {
+                mSubId = subId;
+                mPhone = PhoneUtils.getPhoneUsingSub(subId);
+                init();
+                return;
+            }
+        }
+        finish();
     }
 }
