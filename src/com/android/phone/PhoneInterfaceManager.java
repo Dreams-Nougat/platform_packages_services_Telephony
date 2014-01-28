@@ -45,6 +45,14 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.CallManager;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.PhoneProxyManager;
+import com.android.internal.telephony.dataconnection.DcSwitchManager;
+import android.telephony.TelephonyManager;
+import android.telephony.SubscriptionManager;
+
+import android.os.SystemProperties;
+import com.android.internal.telephony.TelephonyProperties;    
 
 import java.util.List;
 import java.util.ArrayList;
@@ -70,10 +78,20 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
     PhoneGlobals mApp;
     Phone mPhone;
+    PhoneProxyManager mPhoneProxyManager;
     CallManager mCM;
     AppOpsManager mAppOps;
     MainThreadHandler mMainThreadHandler;
     CallHandlerServiceProxy mCallHandlerService;
+    private class PinMmi {
+        public String dialString;
+        public long subId;
+
+        public PinMmi(String dialString, long subId) {
+            this.dialString = dialString;
+            this.subId = subId;
+        }
+    }
 
     /**
      * A request object for use with {@link MainThreadHandler}. Requesters should wait() on the
@@ -111,9 +129,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
             switch (msg.what) {
                 case CMD_HANDLE_PIN_MMI:
+                    PinMmi pinmmi;
                     request = (MainThreadRequest) msg.obj;
+                    pinmmi = (PinMmi) request.argument;
                     request.result = Boolean.valueOf(
-                            mPhone.handlePinMmi((String) request.argument));
+                            mPhoneProxyManager.getPhoneProxyUsingSub(pinmmi.subId).handlePinMmi((String) pinmmi.dialString));
                     // Wake up the requesting thread
                     synchronized (request) {
                         request.notifyAll();
@@ -124,7 +144,8 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                     request = (MainThreadRequest) msg.obj;
                     onCompleted = obtainMessage(EVENT_NEIGHBORING_CELL_DONE,
                             request);
-                    mPhone.getNeighboringCids(onCompleted);
+                    Integer simId = (Integer)request.argument;
+                    mPhoneProxyManager.getPhoneProxy(simId.intValue()).getNeighboringCids(onCompleted);					
                     break;
 
                 case EVENT_NEIGHBORING_CELL_DONE:
@@ -232,11 +253,24 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         }
     }
 
+    static PhoneInterfaceManager init(PhoneGlobals app, PhoneProxyManager PhoneProxyManager,
+            CallHandlerServiceProxy callHandlerService) {
+        synchronized (PhoneInterfaceManager.class) {
+            if (sInstance == null) {
+                sInstance = new PhoneInterfaceManager(app, PhoneProxyManager, callHandlerService);
+            } else {
+                Log.wtf(LOG_TAG, "init() called multiple times!  sInstance = " + sInstance);
+            }
+            return sInstance;
+        }
+    }
+
     /** Private constructor; @see init() */
     private PhoneInterfaceManager(PhoneGlobals app, Phone phone,
             CallHandlerServiceProxy callHandlerService) {
         mApp = app;
         mPhone = phone;
+        mPhoneProxyManager = PhoneFactory.getPhoneProxyManager();
         mCM = PhoneGlobals.getInstance().mCM;
         mAppOps = (AppOpsManager)app.getSystemService(Context.APP_OPS_SERVICE);
         mMainThreadHandler = new MainThreadHandler();
@@ -244,12 +278,25 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         publish();
     }
 
+    private PhoneInterfaceManager(PhoneGlobals app, PhoneProxyManager PhoneProxyManager,
+            CallHandlerServiceProxy callHandlerService) {
+        mApp = app;
+        mPhone = PhoneProxyManager.getPhoneProxy(TelephonyManager.getDefault().getDefaultSim());
+        mPhoneProxyManager = PhoneProxyManager;
+        mCM = PhoneGlobals.getInstance().mCM;
+        mAppOps = (AppOpsManager)app.getSystemService(Context.APP_OPS_SERVICE);
+        mMainThreadHandler = new MainThreadHandler();
+        mCallHandlerService = callHandlerService;
+        publish();
+    }
+
+
     private void publish() {
         if (DBG) log("publish: " + this);
 
         ServiceManager.addService("phone", this);
     }
-
+      
     //
     // Implementation of the ITelephony interface.
     //
@@ -265,17 +312,30 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
             return;
         }
 
-        // PENDING: should we just silently fail if phone is offhook or ringing?
-        PhoneConstants.State state = mCM.getState();
-        if (state != PhoneConstants.State.OFFHOOK && state != PhoneConstants.State.RINGING) {
-            Intent  intent = new Intent(Intent.ACTION_DIAL, Uri.parse(url));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            mApp.startActivity(intent);
-        }
+        // Because we cannot know what sim user will use to make this call finally, we don't check here
+        // we will check when user press SEND really
+        Intent  intent = new Intent(Intent.ACTION_DIAL, Uri.parse(url));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        mApp.startActivity(intent);
     }
 
     public void call(String callingPackage, String number) {
-        if (DBG) log("call: " + number);
+
+        int defaultSubId = 0;
+        callUsingSub(callingPackage, number, defaultSubId);
+    }
+
+    public void callUsingSub(String callingPackage, String number, long subId) {
+        if (DBG) log("call: " + number + " from " + subId);
+
+        int simId = SubscriptionManager.getSimId(subId);
+
+        if (simId == SubscriptionManager.SIM_NOT_INSERTED) {
+            if (DBG) {
+                log("call: wrong sim id");
+            }
+            return;
+        }
 
         // This is just a wrapper around the ACTION_CALL intent, but we still
         // need to do a permission check since we're calling startActivity()
@@ -294,6 +354,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
         Intent intent = new Intent(Intent.ACTION_CALL, Uri.parse(url));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.putExtra(PhoneConstants.SUB_ID_KEY, subId);        
         mApp.startActivity(intent);
     }
 
@@ -332,6 +393,27 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      * @return true is a call was ended
      */
     public boolean endCall() {
+        int defaultSubId = 0;
+        return endCallUsingSub(defaultSubId);
+    }
+
+    /**
+     * End call on specific subscription if there is a call in progress, otherwise does nothing.
+     *
+     * @param subId The indicated subscription id.
+     * @return whether it hung up
+     */     
+    public boolean endCallUsingSub(long subId) {
+
+        int simId = SubscriptionManager.getSimId(subId);
+
+        if (simId == SubscriptionManager.SIM_NOT_INSERTED) {
+            if (DBG) {
+                log("endCall: wrong sim id");
+            }
+            return false;
+        }
+        
         enforceCallPermission();
         return (Boolean) sendRequest(CMD_END_CALL, null);
     }
@@ -418,33 +500,94 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         return (mCM.getState() == PhoneConstants.State.IDLE);
     }
 
+    public boolean isOffhookUsingSub(long subId) {
+
+        int simId = SubscriptionManager.getSimId(subId);
+
+        if (simId == SubscriptionManager.SIM_NOT_INSERTED) {
+            if (DBG) {
+                log("isPhoneOffhook: wrong sim id");
+            }
+            return false;
+        }       
+        
+        return (mPhoneProxyManager.getPhoneProxy(simId).getState() == PhoneConstants.State.OFFHOOK);
+    }
+
+    public boolean isRingingUsingSub(long subId) {
+
+        int simId = SubscriptionManager.getSimId(subId);
+
+        if (simId == SubscriptionManager.SIM_NOT_INSERTED) {
+            if (DBG) {
+                log("isPhoneRinging: wrong sim id");
+            }
+            return false;
+        }        
+        
+        return (mPhoneProxyManager.getPhoneProxy(simId).getState() == PhoneConstants.State.RINGING);
+    }
+
+    public boolean isIdleUsingSub(long subId) {
+
+        int simId = SubscriptionManager.getSimId(subId);
+
+        if (simId == SubscriptionManager.SIM_NOT_INSERTED) {
+            if (DBG) {
+                log("isPhoneIdle: wrong sim id");
+            }
+            return false;
+        }        
+    
+        return (mPhoneProxyManager.getPhoneProxy(simId).getState() == PhoneConstants.State.IDLE);
+    }
+    
+
     public boolean isSimPinEnabled() {
         enforceReadPermission();
         return (PhoneGlobals.getInstance().isSimPinEnabled());
     }
 
     public boolean supplyPin(String pin) {
-        int [] resultArray = supplyPinReportResult(pin);
+        return supplyPinUsingSub(pin, SubscriptionManager.getDefaultSubId());
+    }
+
+    public boolean supplyPinUsingSub(String pin, long subId) {
+        int [] resultArray = supplyPinReportResultUsingSub(pin, subId);
         return (resultArray[0] == PhoneConstants.PIN_RESULT_SUCCESS) ? true : false;
     }
 
     public boolean supplyPuk(String puk, String pin) {
-        int [] resultArray = supplyPukReportResult(puk, pin);
+        return supplyPukUsingSub(puk, pin, SubscriptionManager.getDefaultSubId());
+    }
+
+    public boolean supplyPukUsingSub(String puk, String pin, long subId) {
+        int [] resultArray = supplyPukReportResultUsingSub(puk, pin, subId);
         return (resultArray[0] == PhoneConstants.PIN_RESULT_SUCCESS) ? true : false;
     }
 
     /** {@hide} */
     public int[] supplyPinReportResult(String pin) {
+        return supplyPinReportResultUsingSub(pin, SubscriptionManager.getDefaultSubId());
+    }
+
+    /** {@hide} */
+    public int[] supplyPinReportResultUsingSub(String pin, long subId) {
         enforceModifyPermission();
-        final UnlockSim checkSimPin = new UnlockSim(mPhone.getIccCard());
+        final UnlockSim checkSimPin = new UnlockSim(mPhoneProxyManager.getPhoneProxyUsingSub(subId).getIccCard());
         checkSimPin.start();
         return checkSimPin.unlockSim(null, pin);
     }
 
     /** {@hide} */
     public int[] supplyPukReportResult(String puk, String pin) {
+        return supplyPukReportResultUsingSub(puk, pin, SubscriptionManager.getDefaultSubId());
+    }
+
+    /** {@hide} */
+    public int[] supplyPukReportResultUsingSub(String puk, String pin, long subId) {
         enforceModifyPermission();
-        final UnlockSim checkSimPuk = new UnlockSim(mPhone.getIccCard());
+        final UnlockSim checkSimPuk = new UnlockSim(mPhoneProxyManager.getPhoneProxyUsingSub(subId).getIccCard());
         checkSimPuk.start();
         return checkSimPuk.unlockSim(puk, pin);
     }
@@ -549,66 +692,88 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     }
 
     public void updateServiceLocation() {
-        // No permission check needed here: this call is harmless, and it's
-        // needed for the ServiceState.requestStateUpdate() call (which is
-        // already intentionally exposed to 3rd parties.)
-        mPhone.updateServiceLocation();
+        updateServiceLocationUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    public void updateServiceLocationUsingSim(int simId) {
+        mPhoneProxyManager.getPhoneProxy(simId).updateServiceLocation();		
     }
 
     public boolean isRadioOn() {
-        return mPhone.getServiceState().getVoiceRegState() != ServiceState.STATE_POWER_OFF;
+        return isRadioOnUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+    public boolean isRadioOnUsingSim(int simId) {
+        return mPhoneProxyManager.getPhoneProxy(simId).getServiceState().getVoiceRegState() != ServiceState.STATE_POWER_OFF;
     }
 
     public void toggleRadioOnOff() {
-        enforceModifyPermission();
-        mPhone.setRadioPower(!isRadioOn());
+       toggleRadioOnOffUsingSim(TelephonyManager.getDefault().getDefaultSim());
     }
-    public boolean setRadio(boolean turnOn) {
+    
+    public void toggleRadioOnOffUsingSim(int simId) {
         enforceModifyPermission();
-        if ((mPhone.getServiceState().getVoiceRegState() != ServiceState.STATE_POWER_OFF) != turnOn) {
-            toggleRadioOnOff();
+        mPhoneProxyManager.getPhoneProxy(simId).setRadioPower(!isRadioOnUsingSim(simId));
+    }
+
+    public boolean setRadio(boolean turnOn) {
+        return setRadioUsingSim(turnOn, TelephonyManager.getDefault().getDefaultSim());
+    }
+    
+    public boolean setRadioUsingSim(boolean turnOn, int simId) {
+        enforceModifyPermission();
+        if ((mPhoneProxyManager.getPhoneProxy(simId).getServiceState().getVoiceRegState() != ServiceState.STATE_POWER_OFF) != turnOn) {
+            toggleRadioOnOffUsingSim(simId);
         }
         return true;
     }
+
     public boolean setRadioPower(boolean turnOn) {
+        return setRadioPowerUsingSim(turnOn, TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    public boolean setRadioPowerUsingSim(boolean turnOn, int simId) {
         enforceModifyPermission();
-        mPhone.setRadioPower(turnOn);
+        mPhoneProxyManager.getPhoneProxy(simId).setRadioPower(turnOn);
         return true;
     }
 
-    public boolean enableDataConnectivity() {
+    public boolean enableDataConnectivity(int simId) {
         enforceModifyPermission();
         ConnectivityManager cm =
                 (ConnectivityManager)mApp.getSystemService(Context.CONNECTIVITY_SERVICE);
-        cm.setMobileDataEnabled(true);
+        cm.setMobileDataEnabled(true, simId);
         return true;
     }
 
-    public int enableApnType(String type) {
+    public int enableApnType(String type, int simId) {
         enforceModifyPermission();
-        return mPhone.enableApnType(type);
+        return DcSwitchManager.getInstance().enableApnType(type, simId);
     }
 
-    public int disableApnType(String type) {
+    public int disableApnType(String type, int simId) {
         enforceModifyPermission();
-        return mPhone.disableApnType(type);
+        return DcSwitchManager.getInstance().disableApnType(type, simId);
     }
 
-    public boolean disableDataConnectivity() {
+    public boolean disableDataConnectivity(int simId) {
         enforceModifyPermission();
         ConnectivityManager cm =
                 (ConnectivityManager)mApp.getSystemService(Context.CONNECTIVITY_SERVICE);
-        cm.setMobileDataEnabled(false);
+        cm.setMobileDataEnabled(false, simId);
         return true;
     }
 
-    public boolean isDataConnectivityPossible() {
-        return mPhone.isDataConnectivityPossible();
+    public boolean isDataConnectivityPossible(int simId) {
+        return DcSwitchManager.getInstance().isDataConnectivityPossible(PhoneConstants.APN_TYPE_DEFAULT, simId);
     }
 
     public boolean handlePinMmi(String dialString) {
+        return handlePinMmiUsingSub(dialString, SubscriptionManager.getDefaultSubId());
+    }
+
+    public boolean handlePinMmiUsingSub(String dialString, long subId) {
         enforceModifyPermission();
-        return (Boolean) sendRequest(CMD_HANDLE_PIN_MMI, dialString);
+        return (Boolean) sendRequest(CMD_HANDLE_PIN_MMI, new PinMmi(dialString, subId));
     }
 
     public void cancelMissedCallsNotification() {
@@ -620,16 +785,45 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         return DefaultPhoneNotifier.convertCallState(mCM.getState());
     }
 
-    public int getDataState() {
-        return DefaultPhoneNotifier.convertDataState(mPhone.getDataConnectionState());
+    public int getDataState(int simId) {
+        if (simId == -1) {
+            ConnectivityManager cm =
+                (ConnectivityManager)mApp.getSystemService(Context.CONNECTIVITY_SERVICE);
+            Phone[] phones = PhoneProxyManager.getPhoneProxys();
+            for (int i=0, length=phones.length; i<length; i++) {
+                if (cm.getMobileDataEnabled(i)) {
+                    simId = i;
+                    break;
+                }
+            }
+        }
+        if (simId == -1)
+            simId = PhoneConstants.SIM_ID_1;
+        return DefaultPhoneNotifier.convertDataState(mPhoneProxyManager.getPhoneProxy(simId).getDataConnectionState());
     }
 
-    public int getDataActivity() {
-        return DefaultPhoneNotifier.convertDataActivityState(mPhone.getDataActivityState());
+    public int getDataActivity(int simId) {
+        if (simId == -1) {
+            ConnectivityManager cm =
+                (ConnectivityManager)mApp.getSystemService(Context.CONNECTIVITY_SERVICE);
+            Phone[] phones = PhoneProxyManager.getPhoneProxys();
+            for (int i=0, length=phones.length; i<length; i++) {
+                if (cm.getMobileDataEnabled(i)) {
+                    simId = i;
+                    break;
+                }
+            }
+        }
+        if (simId == -1)
+            simId = PhoneConstants.SIM_ID_1;
+        return DefaultPhoneNotifier.convertDataActivityState(mPhoneProxyManager.getPhoneProxy(simId).getDataActivityState());
     }
 
-    @Override
     public Bundle getCellLocation() {
+        return getCellLocationUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    public Bundle getCellLocationUsingSim(int simId) {
         try {
             mApp.enforceCallingOrSelfPermission(
                 android.Manifest.permission.ACCESS_FINE_LOCATION, null);
@@ -644,7 +838,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         if (checkIfCallerIsSelfOrForegoundUser()) {
             if (DBG_LOC) log("getCellLocation: is active user");
             Bundle data = new Bundle();
-            mPhone.getCellLocation().fillInNotifierBundle(data);
+            mPhoneProxyManager.getPhoneProxy(simId).getCellLocation().fillInNotifierBundle(data);
             return data;
         } else {
             if (DBG_LOC) log("getCellLocation: suppress non-active user");
@@ -652,23 +846,31 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         }
     }
 
-    @Override
     public void enableLocationUpdates() {
-        mApp.enforceCallingOrSelfPermission(
-                android.Manifest.permission.CONTROL_LOCATION_UPDATES, null);
-        mPhone.enableLocationUpdates();
+        enableLocationUpdatesUsingSim(TelephonyManager.getDefault().getDefaultSim());
     }
 
-    @Override
+    public void enableLocationUpdatesUsingSim(int simId) {
+        mApp.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CONTROL_LOCATION_UPDATES, null);
+        mPhoneProxyManager.getPhoneProxy(simId).enableLocationUpdates();
+    }
+
     public void disableLocationUpdates() {
-        mApp.enforceCallingOrSelfPermission(
-                android.Manifest.permission.CONTROL_LOCATION_UPDATES, null);
-        mPhone.disableLocationUpdates();
+        disableLocationUpdatesUsingSim(TelephonyManager.getDefault().getDefaultSim());
     }
 
-    @Override
-    @SuppressWarnings("unchecked")
+    public void disableLocationUpdatesUsingSim(int simId) {
+        mApp.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CONTROL_LOCATION_UPDATES, null);
+        mPhoneProxyManager.getPhoneProxy(simId).disableLocationUpdates();
+    }
+
     public List<NeighboringCellInfo> getNeighboringCellInfo(String callingPackage) {
+        return getNeighboringCellInfoUsingSim(callingPackage, TelephonyManager.getDefault().getDefaultSim());
+    }
+    
+    public List<NeighboringCellInfo> getNeighboringCellInfoUsingSim(String callingPackage, int simId) {
         try {
             mApp.enforceCallingOrSelfPermission(
                     android.Manifest.permission.ACCESS_FINE_LOCATION, null);
@@ -692,7 +894,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
             try {
                 cells = (ArrayList<NeighboringCellInfo>) sendRequest(
-                        CMD_HANDLE_NEIGHBORING_CELL, null);
+                        CMD_HANDLE_NEIGHBORING_CELL, new Integer(simId));
             } catch (RuntimeException e) {
                 Log.e(LOG_TAG, "getNeighboringCellInfo " + e);
             }
@@ -703,9 +905,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         }
     }
 
-
-    @Override
     public List<CellInfo> getAllCellInfo() {
+        return getAllCellInfoUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    public List<CellInfo> getAllCellInfoUsingSim(int simId) {
         try {
             mApp.enforceCallingOrSelfPermission(
                 android.Manifest.permission.ACCESS_FINE_LOCATION, null);
@@ -719,7 +923,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
         if (checkIfCallerIsSelfOrForegoundUser()) {
             if (DBG_LOC) log("getAllCellInfo: is active user");
-            return mPhone.getAllCellInfo();
+            return mPhoneProxyManager.getPhoneProxy(simId).getAllCellInfo();
         } else {
             if (DBG_LOC) log("getAllCellInfo: suppress non-active user");
             return null;
@@ -727,7 +931,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     }
 
     public void setCellInfoListRate(int rateInMillis) {
-        mPhone.setCellInfoListRate(rateInMillis);
+        setCellInfoListRateUsingSim(rateInMillis, TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    public void setCellInfoListRateUsingSim(int rateInMillis, int simId) {
+        mPhoneProxyManager.getPhoneProxy(simId).setCellInfoListRate(rateInMillis);
     }
 
     //
@@ -813,7 +1021,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     }
 
     public int getActivePhoneType() {
-        return mPhone.getPhoneType();
+        return getActivePhoneTypeUsingSim(TelephonyManager.getDefaultSim());
+    }
+
+    public int getActivePhoneTypeUsingSim(int simId) {
+        return mPhoneProxyManager.getPhoneProxy(simId).getPhoneType();
     }
 
     /**
@@ -843,14 +1055,28 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      * Returns true if CDMA provisioning needs to run.
      */
     public boolean needsOtaServiceProvisioning() {
-        return mPhone.needsOtaServiceProvisioning();
+        return needsOtaServiceProvisioningUsingSub(SubscriptionManager.getDefaultSubId());
+    }
+
+    /**
+     * Returns true if CDMA provisioning needs to run with indicated subscirption id.
+     */
+    public boolean needsOtaServiceProvisioningUsingSub(long subId) {
+        return mPhoneProxyManager.getPhoneProxyUsingSub(subId).needsOtaServiceProvisioning();
     }
 
     /**
      * Returns the unread count of voicemails
      */
     public int getVoiceMessageCount() {
-        return mPhone.getVoiceMessageCount();
+        return getVoiceMessageCountUsingSub(SubscriptionManager.getDefaultSubId());
+    }
+
+    /**
+     * Returns the unread count of voicemails with indicated subscription id.
+     */
+    public int getVoiceMessageCountUsingSub(long subId) {
+        return mPhoneProxyManager.getPhoneProxyUsingSub(subId).getVoiceMessageCount();
     }
 
     /**
@@ -858,32 +1084,59 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      *
      * @Deprecated to be removed Q3 2013 use {@link #getDataNetworkType}.
      */
-    @Override
     public int getNetworkType() {
-        return mPhone.getServiceState().getDataNetworkType();
+        return getNetworkTypeUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    /**
+     * Returns the data network type
+     *
+     * @Deprecated to be removed Q3 2013 use {@link #getDataNetworkType}.
+     */
+    public int getNetworkTypeUsingSim(int simId) {
+        return mPhoneProxyManager.getPhoneProxy(simId).getServiceState().getDataNetworkType();
     }
 
     /**
      * Returns the data network type
      */
-    @Override
     public int getDataNetworkType() {
-        return mPhone.getServiceState().getDataNetworkType();
+        return getDataNetworkTypeUsingSim(TelephonyManager.getDefault().getDefaultSim());
     }
 
     /**
      * Returns the data network type
      */
-    @Override
+    public int getDataNetworkTypeUsingSim(int simId) {
+        return mPhoneProxyManager.getPhoneProxy(simId).getServiceState().getDataNetworkType();
+    }
+    
+    /**
+     * Returns the voice network type
+     */
     public int getVoiceNetworkType() {
-        return mPhone.getServiceState().getVoiceNetworkType();
+        return getVoiceNetworkTypeUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    /**
+     * Returns the voice network type
+     */
+    public int getVoiceNetworkTypeUsingSim(int simId) {
+        return mPhoneProxyManager.getPhoneProxy(simId).getServiceState().getVoiceNetworkType();
     }
 
     /**
      * @return true if a ICC card is present
      */
     public boolean hasIccCard() {
-        return mPhone.getIccCard().hasIccCard();
+        return hasIccCardUsingSim(TelephonyManager.getDefault().getDefaultSim());
+    }
+
+    /**
+     * @return true if a ICC card is present with indicated subscription id
+     */
+    public boolean hasIccCardUsingSim(int simId) {
+        return mPhoneProxyManager.getPhoneProxy(simId).getIccCard().hasIccCard();
     }
 
     /**
@@ -895,6 +1148,23 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      * or {@link PHone#LTE_ON_CDMA_TRUE}
      */
     public int getLteOnCdmaMode() {
-        return mPhone.getLteOnCdmaMode();
+        return getLteOnCdmaModeUsingSub(SubscriptionManager.getDefaultSubId());
+    }
+
+    /**
+     * Return if the current radio is LTE on CDMA with indicated subscription id. 
+     * This is a tri-state return value as for a period of time
+     * the mode may be unknown.
+     *
+     * @return {@link Phone#LTE_ON_CDMA_UNKNOWN}, {@link Phone#LTE_ON_CDMA_FALSE}
+     * or {@link PHone#LTE_ON_CDMA_TRUE}
+     */
+    public int getLteOnCdmaModeUsingSub(long subId) {
+        return mPhoneProxyManager.getPhoneProxyUsingSub(subId).getLteOnCdmaMode();
+    }
+
+    
+    public void setPolicyDataEnable(boolean enabled, int simId) {
+        mPhoneProxyManager.getPhoneProxy(simId).setPolicyDataEnable(enabled);
     }
 }

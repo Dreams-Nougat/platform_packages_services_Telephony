@@ -198,7 +198,7 @@ public class SpecialCharSequenceMgr {
         if ((input.startsWith("**04") || input.startsWith("**05"))
                 && input.endsWith("#")) {
             PhoneGlobals app = PhoneGlobals.getInstance();
-            boolean isMMIHandled = app.phone.handlePinMmi(input);
+            boolean isMMIHandled = app.mCM.getFgPhone().handlePinMmi(input);
 
             // if the PUK code is recognized then indicate to the
             // phone app that an attempt to unPUK the device was

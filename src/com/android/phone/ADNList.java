@@ -19,6 +19,8 @@ package com.android.phone;
 import static android.view.Window.PROGRESS_VISIBILITY_OFF;
 import static android.view.Window.PROGRESS_VISIBILITY_ON;
 
+import com.android.internal.telephony.PhoneConstants;
+
 import android.app.ListActivity;
 import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
@@ -28,6 +30,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.telephony.SubscriptionManager;
 import android.util.Log;
 import android.view.Window;
 import android.widget.CursorAdapter;
@@ -40,6 +43,8 @@ import android.widget.TextView;
 public class ADNList extends ListActivity {
     protected static final String TAG = "ADNList";
     protected static final boolean DBG = false;
+
+    protected long mSubId  = SubscriptionManager.SIM_NOT_INSERTED;
 
     private static final String[] COLUMN_NAMES = new String[] {
         "name",
@@ -77,6 +82,8 @@ public class ADNList extends ListActivity {
         setContentView(R.layout.adn_list);
         mEmptyText = (TextView) findViewById(android.R.id.empty);
         mQueryHandler = new QueryHandler(getContentResolver());
+        mSubId = getIntent().getLongExtra(
+                PhoneConstants.SUB_ID_KEY, SubscriptionManager.SIM_NOT_INSERTED);
     }
 
     @Override
@@ -96,7 +103,7 @@ public class ADNList extends ListActivity {
     protected Uri resolveIntent() {
         Intent intent = getIntent();
         if (intent.getData() == null) {
-            intent.setData(Uri.parse("content://icc/adn"));
+            intent.setData(Uri.parse("content://icc/adn" + mSubId));
         }
 
         return intent.getData();

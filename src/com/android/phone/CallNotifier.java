@@ -24,6 +24,7 @@ import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneBase;
+import com.android.internal.telephony.PhoneProxyManager;
 import com.android.internal.telephony.TelephonyCapabilities;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaDisplayInfoRec;
@@ -168,16 +169,18 @@ public class CallNotifier extends Handler
 
     private final BluetoothManager mBluetoothManager;
 
+    private PhoneStateListener[] mPhoneStateListeners = null;
+
     /**
      * Initialize the singleton CallNotifier instance.
      * This is only done once, at startup, from PhoneApp.onCreate().
      */
-    /* package */ static CallNotifier init(PhoneGlobals app, Phone phone, Ringer ringer,
+    /* package */ static CallNotifier init(PhoneGlobals app, Ringer ringer,
             CallLogger callLogger, CallStateMonitor callStateMonitor,
             BluetoothManager bluetoothManager, CallModeler callModeler) {
         synchronized (CallNotifier.class) {
             if (sInstance == null) {
-                sInstance = new CallNotifier(app, phone, ringer, callLogger, callStateMonitor,
+                sInstance = new CallNotifier(app, ringer, callLogger, callStateMonitor,
                         bluetoothManager, callModeler);
             } else {
                 Log.wtf(LOG_TAG, "init() called multiple times!  sInstance = " + sInstance);
@@ -187,7 +190,7 @@ public class CallNotifier extends Handler
     }
 
     /** Private constructor; @see init() */
-    private CallNotifier(PhoneGlobals app, Phone phone, Ringer ringer, CallLogger callLogger,
+    private CallNotifier(PhoneGlobals app, Ringer ringer, CallLogger callLogger,
             CallStateMonitor callStateMonitor, BluetoothManager bluetoothManager,
             CallModeler callModeler) {
         mApplication = app;
@@ -210,11 +213,18 @@ public class CallNotifier extends Handler
                                     BluetoothProfile.HEADSET);
         }
 
-        TelephonyManager telephonyManager = (TelephonyManager)app.getSystemService(
-                Context.TELEPHONY_SERVICE);
-        telephonyManager.listen(mPhoneStateListener,
-                PhoneStateListener.LISTEN_MESSAGE_WAITING_INDICATOR
-                | PhoneStateListener.LISTEN_CALL_FORWARDING_INDICATOR);
+        TelephonyManager telephonyManager = (TelephonyManager) app
+                .getSystemService(Context.TELEPHONY_SERVICE);
+        Phone[] phones = PhoneProxyManager.getDefault().getPhoneProxys();
+        int count = phones.length;
+        mPhoneStateListeners = new PhoneStateListener[count];
+        for (int i = 0; i < count; i++) {
+            mPhoneStateListeners[i] = new MutilPhoneStateListener(phones[i].getSimId());
+            telephonyManager.listen(mPhoneStateListeners[i],
+                    PhoneStateListener.LISTEN_MESSAGE_WAITING_INDICATOR
+                            | PhoneStateListener.LISTEN_CALL_FORWARDING_INDICATOR,
+                    phones[i].getSimId());
+        }
     }
 
     private void createSignalInfoToneGenerator() {
@@ -280,7 +290,11 @@ public class CallNotifier extends Handler
                 break;
 
             case PHONE_MWI_CHANGED:
-                onMwiChanged(mApplication.phone.getMessageWaitingIndicator());
+                int simId = msg.arg1;
+                Phone phone = PhoneProxyManager.getDefault().getPhoneProxy(simId);
+                if (phone != null) {
+                    onMwiChanged(phone.getMessageWaitingIndicator(), simId);
+                }
                 break;
 
             case CallStateMonitor.PHONE_CDMA_CALL_WAITING:
@@ -356,17 +370,23 @@ public class CallNotifier extends Handler
         }
     }
 
-    PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
+    private final class MutilPhoneStateListener extends PhoneStateListener {
+        int mSimId;
+
+        public MutilPhoneStateListener(int simId) {
+            mSimId = simId;
+        }
+
         @Override
         public void onMessageWaitingIndicatorChanged(boolean mwi) {
-            onMwiChanged(mwi);
+            onMwiChanged(mwi, mSimId);
         }
 
         @Override
         public void onCallForwardingIndicatorChanged(boolean cfi) {
-            onCfiChanged(cfi);
+            onCfiChanged(cfi, mSimId);
         }
-    };
+    }
 
     /**
      * Handles a "new ringing connection" event from the telephony layer.
@@ -1126,7 +1146,7 @@ public class CallNotifier extends Handler
         PhoneUtils.setAudioMode(mCM);
     }
 
-    private void onMwiChanged(boolean visible) {
+    private void onMwiChanged(boolean visible, int simId) {
         if (VDBG) log("onMwiChanged(): " + visible);
 
         // "Voicemail" is meaningless on non-voice-capable devices,
@@ -1141,21 +1161,27 @@ public class CallNotifier extends Handler
             return;
         }
 
-        mApplication.notificationMgr.updateMwi(visible);
+        mApplication.notificationMgr.updateMwi(visible, simId);
     }
 
     /**
      * Posts a delayed PHONE_MWI_CHANGED event, to schedule a "retry" for a
      * failed NotificationMgr.updateMwi() call.
      */
-    /* package */ void sendMwiChangedDelayed(long delayMillis) {
-        Message message = Message.obtain(this, PHONE_MWI_CHANGED);
-        sendMessageDelayed(message, delayMillis);
+    /* package */ void sendMwiChangedDelayed(long delayMillis, int simId) {
+        if (PhoneUtils.isValidSim(simId)) {
+            Message message = Message.obtain();
+            message.what = PHONE_MWI_CHANGED;
+            message.arg1 = simId;
+            sendMessageDelayed(message, delayMillis);
+        } else {
+            if (VDBG) log("sendMwiChangedDelayed, invalid sim id");
+        }
     }
 
-    private void onCfiChanged(boolean visible) {
+    private void onCfiChanged(boolean visible, int simId) {
         if (VDBG) log("onCfiChanged(): " + visible);
-        mApplication.notificationMgr.updateCfi(visible);
+        mApplication.notificationMgr.updateCfi(visible, simId);
     }
 
     /**

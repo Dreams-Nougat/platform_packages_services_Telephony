@@ -37,6 +37,10 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
+import android.telephony.ServiceState;
+import android.telephony.SubInfoRecord;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -52,17 +56,22 @@ import com.android.internal.telephony.CallStateException;
 import com.android.internal.telephony.CallerInfo;
 import com.android.internal.telephony.CallerInfoAsyncQuery;
 import com.android.internal.telephony.Connection;
+import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.MmiCode;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.PhoneProxyManager;
 import com.android.internal.telephony.TelephonyCapabilities;
 import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.cdma.CdmaConnection;
 import com.android.internal.telephony.sip.SipPhone;
 import com.android.phone.CallGatewayManager.RawGatewayInfo;
+import com.android.phone.SubPickAdapter.SubPickItem;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -2547,7 +2556,7 @@ public class PhoneUtils {
      * @param number the phone number, or SIP address.
      */
     public static Phone pickPhoneBasedOnNumber(CallManager cm,
-            String scheme, String number, String primarySipUri) {
+            String scheme, String number, String primarySipUri, long subId) {
         if (DBG) {
             log("pickPhoneBasedOnNumber: scheme " + scheme
                     + ", number " + toLogSafePhoneNumber(number)
@@ -2559,6 +2568,11 @@ public class PhoneUtils {
             Phone phone = getSipPhoneFromUri(cm, primarySipUri);
             if (phone != null) return phone;
         }
+
+        if (isValidSubId(PhoneGlobals.getInstance(), subId)) {
+            return PhoneProxyManager.getPhoneProxyUsingSub(subId);
+        }
+
         return cm.getDefaultPhone();
     }
 
@@ -2765,4 +2779,276 @@ public class PhoneUtils {
         return context.getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
     }
+
+    /**
+     * Check if there is any specific phone type.
+     * @return true if there is, false there is not.
+     */
+    static final boolean hasPhoneType(int type) {
+        final Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        for (Phone phone : phones) {
+            if (phone.getPhoneType() == type) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Register ICC status for all phones.
+     */
+    static final void registerIccStatus(Handler handler, int event) {
+        final Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        IccCard sim;
+
+        for (Phone phone : phones) {
+            sim = phone.getIccCard();
+            if (sim != null) {
+                if (VDBG) Log.v(LOG_TAG, "register for ICC status, sim " + phone.getSimId());
+                sim.registerForNetworkLocked(handler, event, phone);
+            }
+        }
+    }
+
+    /**
+     * Check if support the otasp for all phones.
+     */
+    static final boolean supportsOtasp() {
+        final Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        for (Phone phone : phones) {
+            if (TelephonyCapabilities.supportsOtasp(phone)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Set the radio power on/off state for all phones.
+     * @param enabled true means on, false means off. 
+     */
+    static final void setRadioPower(boolean enabled) {
+        final Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        for (Phone phone : phones) {
+            phone.setRadioPower(enabled);
+        }
+    }
+
+    /**
+     * Pick the best phone for ECC. The best phone should be radio on and in
+     * service, if not, it should be on radio, else it is default phone.
+     *
+     * @return
+     */
+    static Phone pickBestPhoneForEmergencyCall() {
+        Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        Phone selectPhone = null;
+        for (Phone phone : phones) {
+            if (ServiceState.STATE_IN_SERVICE == phone.getServiceState().getState()) {
+                // the slot is radio on & state is in service
+                log("pickBestPhoneForEmergencyCall, radio on & in service, simId:"
+                        + phone.getSimId());
+                return phone;
+            } else if (ServiceState.STATE_POWER_OFF != phone.getServiceState().getState()) {
+                // the slot is radio on
+                log("pickBestPhoneForEmergencyCall, radio on, simId:" + phone.getSimId());
+                if (selectPhone == null) {
+                    selectPhone = phone;
+                }
+            }
+        }
+        if (selectPhone == null) {
+            log("pickBestPhoneForEmergencyCall, return default phone");
+            selectPhone = CallManager.getInstance().getDefaultPhone();
+        }
+        return selectPhone;
+    }
+
+    static boolean isValidSim(int simId) {
+        if (simId >= 0 && simId < getSimCount()) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Sets a TTY mode option for all phone.
+     * @param ttyMode is a one of the following:
+     * - {@link com.android.internal.telephony.Phone#TTY_MODE_OFF}
+     * - {@link com.android.internal.telephony.Phone#TTY_MODE_FULL}
+     * - {@link com.android.internal.telephony.Phone#TTY_MODE_HCO}
+     * - {@link com.android.internal.telephony.Phone#TTY_MODE_VCO}
+     * @param onComplete a callback message id when the action is completed
+     * @param handler a handler to handle the on complete action.
+     */
+    static final void setTtyMode(int ttyMode, int onComplete, Handler handler) {
+        final Phone[] phones = PhoneProxyManager.getPhoneProxys();
+        for (Phone phone : phones) {
+            final Message message = handler.obtainMessage(onComplete);
+            message.obj = phone;
+            phone.setTTYMode(ttyMode, message);
+        }
+    }
+    /**
+     * get sim count on the device
+     * @return
+     */
+    public static int getSimCount() {
+        int simCount = TelephonyManager.getDefault().getSimCount();
+        return simCount;
+    }
+
+    /**
+     * get active SubInfo list on the device
+     * @param context
+     * @return
+     */
+    public static List<SubInfoRecord> getActivatedSubInfoList(Context context) {
+        List<SubInfoRecord> subInfoLists = SubscriptionManager.getActivatedSubInfoList(context);
+        if (subInfoLists != null) {
+            Collections.sort(subInfoLists, new Comparator<SubInfoRecord>() {
+                @Override
+                public int compare(SubInfoRecord arg0, SubInfoRecord arg1) {
+                    return arg0.mSimId - arg1.mSimId;
+                }
+            });
+        }
+        return subInfoLists;
+    }
+
+    /**
+     * get count of active SubInfo on the device
+     * @param context
+     * @return
+     */
+    public static int getActivatedSubInfoCount(Context context) {
+        int activeSubInfoCount = 0;
+        List<SubInfoRecord> subInfoLists = getActivatedSubInfoList(context);
+        if (subInfoLists != null) {
+            activeSubInfoCount = subInfoLists.size();
+        }
+        return activeSubInfoCount;
+    }
+
+    /**
+     * get first active SubInfo on the device
+     * @param context
+     * @return
+     */
+    public static SubInfoRecord getFirstActiveSubInfoRecord(Context context) {
+        SubInfoRecord subInfoRecord = null;
+        List<SubInfoRecord> subInfoLists = getActivatedSubInfoList(context);
+        if (subInfoLists != null && subInfoLists.size() >= 1) {
+            subInfoRecord = subInfoLists.get(0);
+        }
+        return subInfoRecord;
+    }
+
+    /**
+     * Check whether there has active SubInfo indicated by given subId on the device.
+     * @param context
+     * @param subId
+     * @return
+     */
+    public static boolean isValidSubId(Context context, long subId) {
+        boolean isValid = false;
+        List<SubInfoRecord> activeSubInfoList = SubscriptionManager.getActivatedSubInfoList(context);
+        if (activeSubInfoList != null) {
+            for (SubInfoRecord subInfoRecord : activeSubInfoList) {
+                if (subInfoRecord.mSubId == subId) {
+                    isValid = true;
+                    break;
+                }
+            }
+        }
+
+        return isValid;
+    }
+
+    /**
+     * pass Sub-related information through intents
+     * @param context
+     * @param src
+     * @param dst
+     */
+    public static void checkAndCopySubExtras(Context context, Intent src, Intent dst) {
+        if (src == null || dst == null) {
+            Log.i(LOG_TAG, "unvalid intent in copySimFlagsExtras()");
+        }
+
+        // Here we keep sub-related extra passed though intents
+        long subId = src.getLongExtra(PhoneConstants.SUB_ID_KEY, SubPickHandler.INVALID_SUB_ID);
+        if (isValidSubId(context, subId)) {
+            dst.putExtra(PhoneConstants.SUB_ID_KEY, subId);
+        }
+    }
+
+    /**
+     * generate SubPickItemList for SubPickAdapter.
+     * @param context   context to use
+     * @param withSipItem   indicate whether including sip item for sub pick dialog.
+     * @param withUnInsertSim   indicate whether including item which doesn't have sim inserted.
+     * @return
+     */
+    public static List<SubPickItem> getSubPickItemList(Context context,boolean withSipItem, boolean withUnInsertSim) {
+        List<SubPickItem> items = new ArrayList<SubPickItem>();
+        List<SubInfoRecord> activeSubInfoLists = getActivatedSubInfoList(context);
+        if (activeSubInfoLists == null) {
+            return items;
+        }
+
+        // sort SubInfoList by simId
+        Collections.sort(activeSubInfoLists, new Comparator<SubInfoRecord>() {
+            @Override
+            public int compare(SubInfoRecord arg0, SubInfoRecord arg1) {
+                return arg0.mSimId - arg1.mSimId;
+            }
+        });
+
+        int simCount = getSimCount();
+        boolean[] isSimInsertArray = new boolean[simCount];     // true for has insert sim.
+        for (int i = 0; i < isSimInsertArray.length; i++) {
+            isSimInsertArray[i] = false;
+        }
+
+        // add active SubInfo
+        for (SubInfoRecord subInfoRecord : activeSubInfoLists) {
+            SubPickItem item = new SubPickItem(subInfoRecord, SubPickAdapter.ITEM_TYPE_SUB, SubPickHandler.INVALID_SIM_ID);
+            isSimInsertArray[subInfoRecord.mSimId] = true;
+            items.add(item);
+        }
+
+        // add sip item if needed
+        if (withSipItem) {
+            SubPickItem item = new SubPickItem(null, SubPickAdapter.ITEM_TYPE_INTERNET, SubPickHandler.INVALID_SIM_ID);
+            items.add(item);
+        }
+
+        // add unInsert sims if needed
+        if (withUnInsertSim) {
+            for (int i = 0; i < simCount; i++) {
+                if (!isSimInsertArray[i]) {
+                    SubPickItem item = new SubPickItem(null, SubPickAdapter.ITEM_TYPE_TEXT, i);
+                    items.add(item);
+                }
+            }
+        }
+        if (DBG) {
+            dumpSimPickerItems(items);
+        }
+        return items;
+    }
+
+    private static void dumpSimPickerItems(List<SubPickItem> items) {
+        Log.d(LOG_TAG, "------------Sim Items Dump Begin------------");
+        Log.d(LOG_TAG, "items.size(): " + items.size());
+        for (int i = 0; i < items.size(); i++) {
+            Log.d(LOG_TAG, "items.get(" + i + ").mSimId: " + items.get(i).mSimId);
+            Log.d(LOG_TAG, "items.get(" + i + ").mSubInfoRecord: " + items.get(i).mSubInfoRecord);
+        }
+        Log.d(LOG_TAG, "------------Sim Items Dump End------------");
+    }
+
 }

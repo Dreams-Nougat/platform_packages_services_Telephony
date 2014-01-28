@@ -1520,4 +1520,10 @@
     <!-- String resource for the font-family to use for the call setting activity's title
          Do not translate. -->
     <string name="call_settings_title_font_family">sans-serif-light</string>
+
+    <!-- String resource for the data connection active. -->
+    <string name="data_connection_active_tips">Data enabled on <xliff:g id="data_connection_active_sim">%s</xliff:g></string>
+
+    <!-- String resource for the Roaming active. -->
+    <string name="roaming_active_tips">Apply on <xliff:g id="roaming_active_sim">%s</xliff:g></string>
 </resources>
