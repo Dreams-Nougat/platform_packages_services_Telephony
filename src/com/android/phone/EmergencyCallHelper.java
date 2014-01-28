@@ -20,6 +20,7 @@ import com.android.internal.telephony.CallManager;
 import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.PhoneProxyManager;
 
 import android.content.Context;
 import android.content.Intent;
@@ -209,8 +210,7 @@ public class EmergencyCallHelper extends Handler {
 
             // Deregister for the service state change events.
             unregisterForServiceStateChanged();
-
-            placeEmergencyCall();
+            placeEmergencyCall(PhoneUtils.getPhoneUsingSim(state.getSimId()));
         } else {
             // The service state changed, but we're still not ready to call yet.
             // (This probably was the transition from STATE_POWER_OFF to
@@ -264,7 +264,8 @@ public class EmergencyCallHelper extends Handler {
      */
     private void onRetryTimeout() {
         PhoneConstants.State phoneState = mCM.getState();
-        int serviceState = mCM.getDefaultPhone().getServiceState().getState();
+        Phone phone = PhoneUtils.pickBestPhoneForEmergencyCall();
+        int serviceState = phone.getServiceState().getState();
         if (DBG) log("onRetryTimeout():  phone state " + phoneState
                      + ", service state " + serviceState
                      + ", mNumRetriesSoFar = " + mNumRetriesSoFar);
@@ -290,7 +291,7 @@ public class EmergencyCallHelper extends Handler {
             // these any more now that the radio is powered-on.
             unregisterForServiceStateChanged();
 
-            placeEmergencyCall();  // If the call fails, placeEmergencyCall()
+            placeEmergencyCall(phone);  // If the call fails, placeEmergencyCall(Phone phone)
                                    // will schedule a retry.
         } else {
             // Uh oh; we've waited the full TIME_BETWEEN_RETRIES and the
@@ -352,7 +353,7 @@ public class EmergencyCallHelper extends Handler {
      * If the call succeeds, we're done.
      * If the call fails, schedule a retry of the whole sequence.
      */
-    private void placeEmergencyCall() {
+    private void placeEmergencyCall(Phone phone) {
         if (DBG) log("placeEmergencyCall()...");
 
         // Place an outgoing call to mNumber.
@@ -365,7 +366,7 @@ public class EmergencyCallHelper extends Handler {
 
         if (DBG) log("- placing call to '" + mNumber + "'...");
         int callStatus = PhoneUtils.placeCall(mApp,
-                                              mCM.getDefaultPhone(),
+                                              phone,
                                               mNumber,
                                               null,  // contactUri
                                               true); // isEmergencyCall
@@ -474,17 +475,13 @@ public class EmergencyCallHelper extends Handler {
         // Unregister first, just to make sure we never register ourselves
         // twice.  (We need this because Phone.registerForServiceStateChanged()
         // does not prevent multiple registration of the same handler.)
-        Phone phone = mCM.getDefaultPhone();
-        phone.unregisterForServiceStateChanged(this);  // Safe even if not currently registered
-        phone.registerForServiceStateChanged(this, SERVICE_STATE_CHANGED, null);
+        mCM.unregisterForServiceStateChanged(this);  // Safe even if not currently registered
+        mCM.registerForServiceStateChanged(this, SERVICE_STATE_CHANGED, null);
     }
 
     private void unregisterForServiceStateChanged() {
         // This method is safe to call even if we haven't set mPhone yet.
-        Phone phone = mCM.getDefaultPhone();
-        if (phone != null) {
-            phone.unregisterForServiceStateChanged(this);  // Safe even if unnecessary
-        }
+        mCM.unregisterForServiceStateChanged(this);  // Safe even if unnecessary
         removeMessages(SERVICE_STATE_CHANGED);  // Clean up any pending messages too
     }
 

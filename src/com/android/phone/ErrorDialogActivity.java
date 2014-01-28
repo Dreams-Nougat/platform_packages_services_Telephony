@@ -16,6 +16,8 @@
 
 package com.android.phone;
 
+import com.android.internal.telephony.PhoneConstants;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -32,12 +34,15 @@ public class ErrorDialogActivity extends Activity {
     public static final String SHOW_MISSING_VOICEMAIL_NO_DIALOG_EXTRA = "show_missing_voicemail";
     public static final String ERROR_MESSAGE_ID_EXTRA = "error_message_id";
 
+    private long mSubId = SubPickHandler.INVALID_SUB_ID;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         final boolean showVoicemailDialog = getIntent().getBooleanExtra(
                 SHOW_MISSING_VOICEMAIL_NO_DIALOG_EXTRA, false);
+        mSubId = getIntent().getLongExtra(PhoneConstants.SUB_ID_KEY, SubPickHandler.INVALID_SUB_ID);
 
         if (showVoicemailDialog) {
             showMissingVoicemailErrorDialog();
@@ -107,6 +112,7 @@ public class ErrorDialogActivity extends Activity {
         // navigate to the Voicemail setting in the Call Settings activity.
         Intent intent = new Intent(CallFeaturesSetting.ACTION_ADD_VOICEMAIL);
         intent.setClass(this, CallFeaturesSetting.class);
+        intent.putExtra(PhoneConstants.SUB_ID_KEY, mSubId);
         startActivity(intent);
         finish();
     }

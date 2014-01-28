@@ -33,7 +33,8 @@ import android.widget.TextView;
 /**
  * Pin2 entry screen.
  */
-public class GetPin2Screen extends Activity implements TextView.OnEditorActionListener {
+public class GetPin2Screen extends Activity implements TextView.OnEditorActionListener,
+        PhoneGlobals.SimInfoUpdateListener {
     private static final String LOG_TAG = PhoneGlobals.LOG_TAG;
 
     private EditText mPin2Field;
@@ -52,6 +53,8 @@ public class GetPin2Screen extends Activity implements TextView.OnEditorActionLi
 
         mOkButton = (Button) findViewById(R.id.ok);
         mOkButton.setOnClickListener(mClicked);
+
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
     }
 
     private String getPin2() {
@@ -90,6 +93,17 @@ public class GetPin2Screen extends Activity implements TextView.OnEditorActionLi
             returnResult();
         }
     };
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        finish();
+    }
 
     private void log(String msg) {
         Log.d(LOG_TAG, "[GetPin2] " + msg);

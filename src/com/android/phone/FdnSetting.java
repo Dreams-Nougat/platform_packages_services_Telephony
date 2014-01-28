@@ -16,14 +16,21 @@
 
 package com.android.phone;
 
+import java.util.List;
+import java.util.prefs.PreferenceChangeListener;
+
 import android.app.ActionBar;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.AsyncResult;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.telephony.SimInfoManager;
+import android.telephony.SubscriptionManager;
 import android.util.Log;
+import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceScreen;
 import android.view.MenuItem;
@@ -32,18 +39,24 @@ import android.widget.Toast;
 
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.PhoneProxyManager;
+import com.android.internal.widget.SubscriptionView;
+import com.android.phone.SubPickHandler.SubPickListener;
 
 /**
  * FDN settings UI for the Phone app.
  * Rewritten to look and behave closer to the other preferences.
  */
-public class FdnSetting extends PreferenceActivity
-        implements EditPinPreference.OnPinEnteredListener, DialogInterface.OnCancelListener {
+public class FdnSetting extends PreferenceActivity implements
+        EditPinPreference.OnPinEnteredListener, DialogInterface.OnCancelListener,
+        PhoneGlobals.SimInfoUpdateListener, SubPickListener, Preference.OnPreferenceClickListener {
 
     private static final String LOG_TAG = PhoneGlobals.LOG_TAG;
     private static final boolean DBG = false;
 
     private Phone mPhone;
+    private long mSubId = SubscriptionManager.SIM_NOT_INSERTED;
 
     /**
      * Events we handle.
@@ -57,9 +70,11 @@ public class FdnSetting extends PreferenceActivity
     // Preference is handled solely in xml.
     private static final String BUTTON_FDN_ENABLE_KEY = "button_fdn_enable_key";
     private static final String BUTTON_CHANGE_PIN2_KEY = "button_change_pin2_key";
+    private static final String BUTTON_FDN_LIST_KEY = "button_fdn_list_key";
 
     private EditPinPreference mButtonEnableFDN;
     private EditPinPreference mButtonChangePin2;
+    private Preference mButtonFDNList;
 
     // State variables
     private String mOldPin;
@@ -264,7 +279,7 @@ public class FdnSetting extends PreferenceActivity
                                     break;
                             }
                         }
-                        updateEnableFDN();
+                        updateEnableFDN(mSubId);
                     }
                     break;
 
@@ -435,7 +450,8 @@ public class FdnSetting extends PreferenceActivity
     /**
      * Reflect the updated FDN state in the UI.
      */
-    private void updateEnableFDN() {
+    private void updateEnableFDN(long subId) {
+        mPhone = PhoneUtils.getPhoneUsingSub(subId);
         if (mPhone.getIccCard().getIccFdnEnabled()) {
             mButtonEnableFDN.setTitle(R.string.enable_fdn_ok);
             mButtonEnableFDN.setSummary(R.string.fdn_enabled);
@@ -453,16 +469,14 @@ public class FdnSetting extends PreferenceActivity
 
         addPreferencesFromResource(R.xml.fdn_setting);
 
-        mPhone = PhoneGlobals.getPhone();
-
         //get UI object references
         PreferenceScreen prefSet = getPreferenceScreen();
         mButtonEnableFDN = (EditPinPreference) prefSet.findPreference(BUTTON_FDN_ENABLE_KEY);
         mButtonChangePin2 = (EditPinPreference) prefSet.findPreference(BUTTON_CHANGE_PIN2_KEY);
+        mButtonFDNList = (PreferenceScreen) prefSet.findPreference(BUTTON_FDN_LIST_KEY);
 
         //assign click listener and update state
         mButtonEnableFDN.setOnPinEnteredListener(this);
-        updateEnableFDN();
 
         mButtonChangePin2.setOnPinEnteredListener(this);
 
@@ -483,13 +497,38 @@ public class FdnSetting extends PreferenceActivity
             // android.R.id.home will be triggered in onOptionsItemSelected()
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
+
+        if (null != mButtonFDNList) {
+            mButtonFDNList.setOnPreferenceClickListener(this);
+        }
+        PhoneGlobals.getInstance().addSimInfoUpdateListener(this);
+
+        if (getIntent().hasExtra(PhoneConstants.SLOT_KEY)) {
+            mSubId = getIntent().getLongExtra(PhoneConstants.SLOT_KEY, SubscriptionManager.SIM_NOT_INSERTED);
+            if (PhoneUtils.isValidSubId(mSubId)) {
+                updateEnableFDN(mSubId);
+                return;
+            } else {
+                log("onCreate, get mSubId from intent is invalid = " + mSubId);
+            }
+        }
+
+        doSubPick();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        mPhone = PhoneGlobals.getPhone();
-        updateEnableFDN();
+    private void doSubPick() {
+        if (PhoneUtils.getActivatedSubInfoCount(this) == 1) {
+            final long subId = PhoneUtils.getFirstActiveSubInfoRecord(this).mSubId;
+            onSubPickComplete(SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB, subId, null);
+        } else if (SubscriptionManager.getAllSubInfoCount(this) > 1) {
+            final SubPickHandler subPickHandler = new SubPickHandler(this,
+                    SubPickHandler.getSubPickItemList(this, false, false));
+            subPickHandler.setSubPickListener(this);
+            subPickHandler.setSubViewThemeType(SubscriptionView.LIGHT_THEME);
+            subPickHandler.showSubPickDialog(getResources().getString(R.string.fdn), true);
+        } else {
+            finish();
+        }
     }
 
     /**
@@ -516,8 +555,38 @@ public class FdnSetting extends PreferenceActivity
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        PhoneGlobals.getInstance().removeSimInfoUpdateListener(this);
+    }
+
+    @Override
+    public void handleSimInfoUpdate() {
+        finish();
+    }
+
     private void log(String msg) {
         Log.d(LOG_TAG, "FdnSetting: " + msg);
     }
-}
 
+    @Override
+    public boolean onPreferenceClick(Preference preference) {
+        if (preference == mButtonFDNList) {
+            startActivity(preference.getIntent().putExtra(PhoneConstants.SUBSCRIPTION_KEY, mSubId));
+        }
+        return true;
+    }
+
+    @Override
+    public void onSubPickComplete(int completeKey, long subId, Intent intent) {
+        log("onSubPickComplete, completeKey = " + completeKey +
+                "; subId = " + subId);
+        if (SubPickHandler.SUB_PICK_COMPLETE_KEY_SUB == completeKey) {
+            mSubId = subId;
+            updateEnableFDN(mSubId);
+        } else if (SubPickHandler.SUB_PICK_COMPLETE_KEY_CANCEL == completeKey) {
+            finish();
+        }
+    }
+}

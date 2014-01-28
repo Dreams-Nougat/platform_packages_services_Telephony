@@ -229,7 +229,7 @@ public class OtaUtils {
      */
     public static boolean maybeDoOtaCall(Context context, Handler handler, int request) {
         PhoneGlobals app = PhoneGlobals.getInstance();
-        Phone phone = app.phone;
+        Phone phone = app.mCM.getFgPhone();
 
         if (ActivityManager.isRunningInTestHarness()) {
             Log.i(LOG_TAG, "Don't run provisioning when in test harness");

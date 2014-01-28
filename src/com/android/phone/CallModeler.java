@@ -631,6 +631,11 @@ public class CallModeler extends Handler {
             changed = true;
         }
 
+        // Set the subId.
+        changed = setSubId(call, connection) || changed;
+        // Set the phone type
+        changed = setPhoneType(call, connection) || changed;
+
         return changed;
     }
 
@@ -939,5 +944,39 @@ public class CallModeler extends Handler {
         public Connection getConnection() {
             return mConnection;
         }
+    }
+
+    /**
+     * Set subscription id
+     * @param call
+     * @param connection
+     * @return
+     */
+    private boolean setSubId(Call call, Connection connection) {
+        boolean changed = false;
+        if (connection.getCall() != null) {
+            call.setSubId(connection.getCall().getPhone().getSubscription());
+            changed = true;
+        }
+        return changed;
+    }
+
+    /**
+     * Set phone type
+     * @param call
+     * @param connection
+     * @return
+     */
+    private boolean setPhoneType(Call call, Connection connection) {
+        boolean changed = false;
+        if (connection.getCall() != null) {
+            Phone phone = connection.getCall().getPhone();
+            if (phone != null) {
+                call.setType(phone.getPhoneType());
+                if(DBG) Log.d(TAG, "setPhoneType: " + phone.getPhoneType() + "; call = " + call);
+                changed = true;
+            }
+        }
+        return changed;
     }
 }
