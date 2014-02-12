@@ -73,6 +73,8 @@ import com.android.phone.WiredHeadsetManager.WiredHeadsetListener;
 import com.android.server.sip.SipService;
 import com.android.services.telephony.common.AudioMode;
 
+import static com.android.internal.telephony.PhoneConstants.DEFAULT_SUBSCRIPTION;
+
 /**
  * Global state for the telephony subsystem when running in the primary
  * phone process.
@@ -621,6 +623,12 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
     static Phone getPhone() {
         return getInstance().phone;
     }
+
+    // gets the Phone correspoding to a subscription
+    Phone getPhone(long subscription) {
+        return phone;
+    }
+
 
     Ringer getRinger() {
         return ringer;
@@ -1297,4 +1305,24 @@ public class PhoneGlobals extends ContextWrapper implements WiredHeadsetListener
         }
     };
 
+    /**
+     * Gets the default subscription
+     */
+    public int getDefaultSubscription() {
+        return (int)PhoneFactory.getDefaultSubscription();
+    }
+
+    /**
+     * Gets User preferred Voice subscription setting
+     */
+    public int getVoiceSubscription() {
+        return 1;
+    }
+
+    /*
+     * Gets User preferred Data subscription setting
+     */
+    public int getDataSubscription() {
+        return 1;
+    }
 }
