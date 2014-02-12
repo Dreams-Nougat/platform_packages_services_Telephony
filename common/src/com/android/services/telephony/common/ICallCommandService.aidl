@@ -106,4 +106,9 @@ oneway interface ICallCommandService {
      * device has soft navigation buttons.
      */
     void setSystemBarNavigationEnabled(boolean enable);
+
+    /**
+     * Sets the subscriptionId as new active subscription.
+     */
+    void setActiveSubscription(int subscriptionId);
 }
