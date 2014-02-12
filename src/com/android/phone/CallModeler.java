@@ -124,6 +124,48 @@ public class CallModeler extends Handler {
             case CallStateMonitor.PHONE_ON_DIAL_CHARS:
                 onPostDialChars((AsyncResult) msg.obj, (char) msg.arg1);
                 break;
+<<<<<<< HEAD
+=======
+            case CallStateMonitor.PHONE_SUPP_SERVICE_NOTIFY:
+                if (DBG) Log.d(TAG, "Received Supplementary Notification");
+
+                if (msg.obj != null && ((AsyncResult) msg.obj).result != null) {
+                    mSuppSvcNotification =
+                            (SuppServiceNotification) (((AsyncResult) msg.obj).result);
+                    if (mSuppSvcNotification.code == SuppServiceNotification.MT_CODE_CALL_ON_HOLD
+                            || mSuppSvcNotification.code
+                            == SuppServiceNotification.MT_CODE_CALL_RETRIEVED) {
+                        onPhoneStateChanged(null);
+                    }
+                }
+                break;
+            case CallStateMonitor.PHONE_ACTIVE_SUBSCRIPTION_CHANGE:
+                onActiveSubChanged((AsyncResult) msg.obj);
+                break;
+            case CallStateMonitor.PHONE_ENHANCED_VP_ON:
+                if (DBG) Log.d(TAG, "PHONE_ENHANCED_VP_ON...");
+                if (!mVoicePrivacyState) {
+                    mVoicePrivacyState = true;
+                    onPhoneStateChanged(null);
+                }
+                break;
+            case CallStateMonitor.PHONE_ENHANCED_VP_OFF:
+                if (DBG) Log.d(TAG, "PHONE_ENHANCED_VP_OFF...");
+                if (mVoicePrivacyState) {
+                    mVoicePrivacyState = false;
+                    onPhoneStateChanged(null);
+                }
+                break;
+            case CallStateMonitor.PHONE_SUPP_SERVICE_FAILED:
+                AsyncResult r = (AsyncResult) msg.obj;
+                Phone.SuppService service = (Phone.SuppService) r.result;
+                int val = service.ordinal();
+                if (DBG) Log.d(TAG, "SUPP_SERVICE_FAILED..." +service);
+                for (int i = 0; i < mListeners.size(); i++) {
+                    mListeners.get(i).onSuppServiceFailed(val);
+                }
+                break;
+>>>>>>> a25e562... Display Conference call Failure to the user
             default:
                 break;
         }
@@ -839,6 +881,12 @@ public class CallModeler extends Handler {
         void onUpdate(List<Call> calls);
         void onPostDialAction(Connection.PostDialState state, int callId, String remainingChars,
                 char c);
+<<<<<<< HEAD
+=======
+        void onActiveSubChanged(int activeSub);
+        void onModifyCall(Call call);
+        void onSuppServiceFailed(int service);
+>>>>>>> a25e562... Display Conference call Failure to the user
     }
 
     /**

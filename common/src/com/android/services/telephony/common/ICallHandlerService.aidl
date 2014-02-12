@@ -70,4 +70,9 @@ oneway interface ICallHandlerService {
     void bringToForeground(boolean showDialpad);
 
     void onPostDialWait(int callId, String remainingChars);
+
+    /**
+     * Called when a SuppService Fails.
+     */
+    void onSuppServiceFailed(in int service);
 }
