@@ -1,0 +1,19 @@
+Revision: a7501dc2cd562c537b9ee1637e4acb2638ff814c
+Patch-set: 9
+File: src/com/android/phone/PhoneInterfaceManager.java
+
+401:51-401:63
+Thu Feb 27 00:36:30 2014 +0000
+Author: Legler Wu <1039969@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 1c26d1b5_10f06a45
+Bytes: 64
+The argument is not used in this patch.
+Could you help to add it
+
+408:46-408:58
+Thu Feb 27 00:36:30 2014 +0000
+Author: Legler Wu <1039969@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 1c26d1b5_f0f4be3b
+Bytes: 25
+the argument is not used.
+
