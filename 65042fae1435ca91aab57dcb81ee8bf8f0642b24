@@ -1,0 +1,11 @@
+Revision: 65042fae1435ca91aab57dcb81ee8bf8f0642b24
+Patch-set: 1
+File: src/com/android/phone/CallNotifier.java
+
+1060:0-1060:56
+Fri Feb 28 19:17:15 2014 +0000
+Author: Santos Cordon <1015328@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 3c52b523_ac738727
+Bytes: 22
+fit into one line now?
+
