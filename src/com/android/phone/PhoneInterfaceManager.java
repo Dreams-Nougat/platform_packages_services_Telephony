@@ -46,7 +46,7 @@ import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.CallManager;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.PhoneConstants;
-import com.android.internal.telephony.SubscriptionManager;
+//import com.android.internal.telephony.SubscriptionManager;
 
 import static com.android.internal.telephony.PhoneConstants.SUBSCRIPTION_KEY;
 
@@ -182,16 +182,16 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                     request = (MainThreadRequest) msg.obj;
                     int subscription = (Integer) request.argument;
                     onCompleted = obtainMessage(EVENT_SET_DATA_SUBSCRIPTION_DONE, request);
-                    SubscriptionManager subManager = SubscriptionManager.getInstance();
-                    if (subManager != null) {
+                  //  SubscriptionManager subManager = SubscriptionManager.getInstance();
+                 /* if (subManager != null) {
                         subManager.setDataSubscription(subscription, onCompleted);
-                    } else {
+                    } else {*/
                         // need to return false;
                         // Wake up the requesting thread
                         request.result = false;
                         synchronized (request) {
                             request.notifyAll();
-                        }
+                 //     }
                     }
                     break;
 
