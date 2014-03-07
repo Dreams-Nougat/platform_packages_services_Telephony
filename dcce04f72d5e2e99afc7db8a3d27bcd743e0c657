@@ -30,6 +30,18 @@ UUID: 9c348108_8d5c84b9
 Bytes: 6
 why 1?
 
+1319
+Fri Mar 07 07:23:01 2014 +0000
+Author: Srikanth Chintala <1025864@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 9c348108_8d5c84b9
+UUID: fc4c9db4_a5108469
+Bytes: 176
+These apis are used in PhoneinterfaceManager, for routing legacy to sub based api.
+
+
+In MTK SubscriptionController defaultSub is 1 for N5.
+So as a workaround we kept this as 1.
+
 1325:11-1325:14
 Fri Mar 07 07:17:49 2014 +0000
 Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
