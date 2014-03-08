@@ -1,0 +1,55 @@
+Revision: 05a8110badc1424d83a6a6c66a59228a225041e7
+Patch-set: 14
+File: src/com/android/phone/PhoneGlobals.java
+
+628:10-628:18
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: dcf7d997_8e1bdb85
+Bytes: 49
+This function is not necessary, please remove it.
+
+1311:15-1311:37
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9c2ba1c2_29b3cd7f
+Bytes: 49
+This function is not necessary, please remove it.
+
+1318:15-1318:35
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 3cf1d5a2_715e522b
+Bytes: 49
+This function is not necessary, please remove it.
+
+1325:15-1325:34
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9c2ba1c2_09b88958
+Bytes: 49
+This function is not necessary, please remove it.
+
+File: src/com/android/phone/PhoneInterfaceManager.java
+
+1113:15-1113:19
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: dcf7d997_ae133775
+Bytes: 140
+The function of "getDefaultSubscription()" will not be supplied by PhoneGlobal, please implement it within the PhoneInterfaceManager itself.
+
+1121:20-1121:40
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9c2ba1c2_a91b3dce
+Bytes: 138
+The function of "getVoiceSubscription()" will not be supplied by PhoneGlobal, please implement it within the PhoneInterfaceManager itself.
+
+1129:15-1129:19
+Sat Mar 08 07:35:51 2014 +0000
+Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 3cf1d5a2_b190ba82
+Bytes: 137
+The function of "getDataSubscription()" will not be supplied by PhoneGlobal, please implement it within the PhoneInterfaceManager itself.
+
