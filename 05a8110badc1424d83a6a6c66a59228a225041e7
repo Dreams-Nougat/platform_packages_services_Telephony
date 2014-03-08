@@ -39,6 +39,14 @@ UUID: dcf7d997_ae133775
 Bytes: 140
 The function of "getDefaultSubscription()" will not be supplied by PhoneGlobal, please implement it within the PhoneInterfaceManager itself.
 
+1113
+Sat Mar 08 08:26:54 2014 +0000
+Author: srikanth chintala <1004552@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: dcf7d997_ae133775
+UUID: dcf7d997_0e69abcf
+Bytes: 105
+I think these  it would be appropriate if these 3 functions  are moved to subscriptionmanager/controller.
+
 1121:20-1121:40
 Sat Mar 08 07:35:51 2014 +0000
 Author: Mick Lin <1040043@85c56323-6fa9-3386-8a01-6480fb634889>
