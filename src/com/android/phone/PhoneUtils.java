@@ -18,6 +18,8 @@ package com.android.phone;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.ProgressDialog;
 import android.bluetooth.IBluetoothHeadsetPhone;
 import android.content.ActivityNotFoundException;
@@ -33,6 +35,7 @@ import android.os.Message;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
 import android.os.SystemProperties;
+import android.os.UserHandle;
 import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.VideoProfile;
@@ -1070,7 +1073,31 @@ public class PhoneUtils {
                 newDialog.getButton(DialogInterface.BUTTON_NEGATIVE)
                         .setTextColor(context.getResources().getColor(R.color.dialer_theme_color));
             }
+
+            if (mmiCode.isNetworkInitiated()) {
+                playSoundNotification(context);
+            }
         }
+    }
+
+    static void playSoundNotification(Context mContext) {
+        // Get the Ring and Vibrate mode from the AudioManager according to setting
+        AudioManager audioManager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+        int callsRingerMode = audioManager.getRingerMode();
+
+        Notification notification = new Notification();
+        // Set the effect of Notification according to mode
+        if (callsRingerMode == AudioManager.RINGER_MODE_NORMAL) {
+            // Ring is on but vibrate is off
+            notification.defaults |= Notification.DEFAULT_SOUND;
+        } else if (callsRingerMode == AudioManager.RINGER_MODE_VIBRATE) {
+            // Ring is off but vibrate is on
+            notification.defaults |= Notification.DEFAULT_VIBRATE;
+        }
+
+        NotificationManager mNotifyManager = (NotificationManager)mContext.getSystemService(
+                Context.NOTIFICATION_SERVICE);
+        mNotifyManager.notifyAsUser(null, 0, notification, UserHandle.CURRENT);
     }
 
     /**
