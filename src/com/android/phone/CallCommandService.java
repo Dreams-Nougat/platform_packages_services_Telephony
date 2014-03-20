@@ -61,7 +61,11 @@ class CallCommandService extends ICallCommandService.Stub {
         try {
             CallResult result = mCallModeler.getCallWithId(callId);
             if (result != null) {
-                PhoneUtils.answerCall(result.getConnection().getCall());
+                if (mCallManager.hasActiveFgCall() && mCallManager.hasActiveBgCall()) {
+                    PhoneUtils.answerAndEndActive(mCallManager, result.getConnection().getCall());
+                } else {
+                    PhoneUtils.answerCall(result.getConnection().getCall());
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error during answerCall().", e);
