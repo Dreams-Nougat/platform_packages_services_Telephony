@@ -64,6 +64,8 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     private static final int CMD_ANSWER_RINGING_CALL = 4;
     private static final int CMD_END_CALL = 5;  // not used yet
     private static final int CMD_SILENCE_RINGER = 6;
+    private static final int CMD_SEND_ENVELOPE = 23;
+    private static final int EVENT_SEND_ENVELOPE_DONE = 24;
 
     /** The singleton instance. */
     private static PhoneInterfaceManager sInstance;
@@ -167,6 +169,34 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                     if (DBG) log("CMD_END_CALL: " + (hungUp ? "hung up!" : "no call to hang up"));
                     request.result = hungUp;
                     // Wake up the requesting thread
+                    synchronized (request) {
+                        request.notifyAll();
+                    }
+                    break;
+
+                case CMD_SEND_ENVELOPE:
+                    request = (MainThreadRequest) msg.obj;
+                    onCompleted = obtainMessage(EVENT_SEND_ENVELOPE_DONE, request);
+                    UiccController.getInstance().getUiccCard().sendEnvelopeWithStatus(
+                        (String)request.argument, onCompleted);
+                    break;
+
+                case EVENT_SEND_ENVELOPE_DONE:
+                    ar = (AsyncResult) msg.obj;
+                    request = (MainThreadRequest) ar.userObj;
+                    if (ar.exception == null && ar.result != null) {
+                        request.result = ar.result;
+                    } else {
+                        request.result = new IccIoResult(0x6F, 0, (byte[])null);
+                        if (ar.result == null) {
+                            loge("sendEnvelopeWithStatus: Empty response");
+                        } else if (ar.exception instanceof CommandException) {
+                            loge("sendEnvelopeWithStatus: CommandException: " +
+                                    ar.exception);
+                        } else {
+                            loge("sendEnvelopeWithStatus: exception:" + ar.exception);
+                        }
+                    }
                     synchronized (request) {
                         request.notifyAll();
                     }
@@ -896,5 +926,21 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      */
     public int getLteOnCdmaMode() {
         return mPhone.getLteOnCdmaMode();
+    }
+
+    @Override
+    public String sendEnvelopeWithStatus(String content) {
+        enforceSimCommunicationPermission();
+
+        IccIoResult response = (IccIoResult)sendRequest(CMD_SEND_ENVELOPE, content);
+        if (response.payload == null) {
+          return "";
+        }
+
+        // Append the returned status code to the end of the response payload.
+        String s = Integer.toHexString(
+                (response.sw1 << 8) + response.sw2 + 0x10000).substring(1);
+        s = IccUtils.bytesToHexString(response.payload) + s;
+        return s;
     }
 }
