@@ -65,7 +65,7 @@ public class VisualVoicemailSettingsUtil {
         editor.putBoolean(
                 getVisualVoicemailSharedPrefsKey(IS_USER_SET, phoneAccount),
                 isUserSet);
-        editor.commit();
+        editor.apply();
     }
 
     public static boolean isVisualVoicemailEnabled(Context context,
@@ -116,7 +116,7 @@ public class VisualVoicemailSettingsUtil {
         editor.putString(
                 getVisualVoicemailSharedPrefsKey(OmtpConstants.IMAP_PASSWORD, phoneAccount),
                 message.getImapPassword());
-        editor.commit();
+        editor.apply();
     }
 
     public static String getVisualVoicemailCredentials(Context context, String key,
@@ -143,7 +143,7 @@ public class VisualVoicemailSettingsUtil {
                 PreferenceManager.getDefaultSharedPreferences(context).edit();
         editor.putLong(getVisualVoicemailSharedPrefsKey(SYNC_RETRY_INTERVAL, phoneAccount),
                 Math.min(interval, MAX_SYNC_RETRY_INTERVAL_MS));
-        editor.commit();
+        editor.apply();
     }
 
     public static void setVisualVoicemailLastFullSyncTime(Context context,
