@@ -49,7 +49,7 @@ public class VoicemailNotificationSettingsUtil {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(phone.getContext());
         SharedPreferences.Editor editor = prefs.edit();
         editor.putBoolean(getVoicemailVibrationSharedPrefsKey(phone), isEnabled);
-        editor.commit();
+        editor.apply();
     }
 
     public static boolean isVibrationEnabled(Phone phone) {
@@ -64,7 +64,7 @@ public class VoicemailNotificationSettingsUtil {
 
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString(getVoicemailRingtoneSharedPrefsKey(phone), ringtoneUriStr);
-        editor.commit();
+        editor.apply();
     }
 
     public static Uri getRingtoneUri(Phone phone) {
@@ -99,7 +99,7 @@ public class VoicemailNotificationSettingsUtil {
             SharedPreferences.Editor editor = prefs.edit();
             editor.putBoolean(key, voicemailVibrate)
                     .remove(OLD_VOICEMAIL_VIBRATE_WHEN_SHARED_PREFS_KEY)
-                    .commit();
+                    .apply();
         }
 
         if (prefs.contains(OLD_VOICEMAIL_VIBRATE_WHEN_SHARED_PREFS_KEY)) {
@@ -112,7 +112,7 @@ public class VoicemailNotificationSettingsUtil {
             SharedPreferences.Editor editor = prefs.edit();
             editor.putBoolean(key, voicemailVibrate)
                     .remove(OLD_VOICEMAIL_NOTIFICATION_VIBRATION_SHARED_PREFS_KEY)
-                    .commit();
+                    .apply();
         }
     }
 
@@ -138,7 +138,7 @@ public class VoicemailNotificationSettingsUtil {
             SharedPreferences.Editor editor = prefs.edit();
             editor.putString(key, uriString)
                     .remove(OLD_VOICEMAIL_NOTIFICATION_RINGTONE_SHARED_PREFS_KEY)
-                    .commit();
+                    .apply();
         }
     }
 
