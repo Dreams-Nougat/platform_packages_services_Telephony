@@ -359,10 +359,10 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
      * return value, so let's just return void for now.
      */
     private void answerRingingCallInternal() {
-        final boolean hasRingingCall = !mPhone.getRingingCall().isIdle();
+        final boolean hasRingingCall = mCM.hasActiveRingingCall();
         if (hasRingingCall) {
-            final boolean hasActiveCall = !mPhone.getForegroundCall().isIdle();
-            final boolean hasHoldingCall = !mPhone.getBackgroundCall().isIdle();
+            final boolean hasActiveCall = mCM.hasActiveFgCall();
+            final boolean hasHoldingCall = mCM.hasActiveBgCall();
             if (hasActiveCall && hasHoldingCall) {
                 // Both lines are in use!
                 // TODO: provide a flag to let the caller specify what
