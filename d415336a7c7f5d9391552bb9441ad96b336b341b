@@ -1,0 +1,11 @@
+Revision: d415336a7c7f5d9391552bb9441ad96b336b341b
+Patch-set: 2
+File: src/com/android/phone/PhoneInterfaceManager.java
+
+559
+Wed Jun 04 00:18:49 2014 +0000
+Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7f33447f_d9d7097c
+Bytes: 186
+This same logic "old" logic is present in RadioInfo.java, although thats really "debug/testing" code I think we should change that to call TelephonyManager.isRadioOn() what do you think?
+
