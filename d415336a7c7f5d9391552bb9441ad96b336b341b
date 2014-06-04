@@ -9,3 +9,11 @@ UUID: 7f33447f_d9d7097c
 Bytes: 186
 This same logic "old" logic is present in RadioInfo.java, although thats really "debug/testing" code I think we should change that to call TelephonyManager.isRadioOn() what do you think?
 
+559
+Wed Jun 04 21:10:03 2014 +0000
+Author: Hariprasad Jayakumar <1018623@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7f33447f_d9d7097c
+UUID: 7f33447f_cd1bbc8a
+Bytes: 223
+RadioInfo.isRadioOn() method also checks for service state, that does not change to POWER_OFF in case of targets without modem. Pls check my explanation in the other gerrit https://android-review.googlesource.com/#/c/91701/
+
