@@ -821,15 +821,31 @@ public class PhoneGlobals extends ContextWrapper {
                 // The "data disconnected due to roaming" notification is shown
                 // if (a) you have the "data roaming" feature turned off, and
                 // (b) you just lost data connectivity because you're roaming.
-                boolean disconnectedDueToRoaming =
-                        !phone.getDataRoamingEnabled()
-                        && PhoneConstants.DataState.DISCONNECTED.equals(state)
-                        && Phone.REASON_ROAMING_ON.equals(
-                            intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY));
-                if (mDataDisconnectedDueToRoaming != disconnectedDueToRoaming) {
-                    mDataDisconnectedDueToRoaming = disconnectedDueToRoaming;
-                    mHandler.sendEmptyMessage(disconnectedDueToRoaming
-                            ? EVENT_DATA_ROAMING_DISCONNECTED : EVENT_DATA_ROAMING_OK);
+                if ("DISCONNECTED".equals(state)) {
+                    String reason = intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY);
+                    if ((Phone.REASON_ROAMING_ON.equals(reason) ||
+                         phone.getServiceState().getRoaming()) &&
+                        !phone.getDataRoamingEnabled()) {
+                            if (!mDataDisconnectedDueToRoaming) {
+                                // We just lost our data connection, and the reason
+                                // is that we started roaming. This implies that
+                                // the user has data roaming turned off.
+                                mDataDisconnectedDueToRoaming = true;
+                                mHandler.sendEmptyMessage(EVENT_DATA_ROAMING_DISCONNECTED);
+                            }
+                    } else if (!phone.getServiceState().getRoaming() || // not in roaming anymore
+                               phone.getDataRoamingEnabled()) {         // data roaming allowed
+                        if (mDataDisconnectedDueToRoaming) {
+                            mDataDisconnectedDueToRoaming = false;
+                            mHandler.sendEmptyMessage(EVENT_DATA_ROAMING_OK);
+                        }
+                    }
+                } else if ("CONNECTED".equals(intent.getStringExtra(PhoneConstants.STATE_KEY))) {
+                    if (mDataDisconnectedDueToRoaming) {
+                        // hide data roaming notification if we're connected
+                        mDataDisconnectedDueToRoaming = false;
+                        mHandler.sendEmptyMessage(EVENT_DATA_ROAMING_OK);
+                    }
                 }
             } else if ((action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) &&
                     (mPUKEntryActivity != null)) {
