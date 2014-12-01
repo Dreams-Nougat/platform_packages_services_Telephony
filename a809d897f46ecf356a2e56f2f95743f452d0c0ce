@@ -1,0 +1,11 @@
+Revision: a809d897f46ecf356a2e56f2f95743f452d0c0ce
+Patch-set: 3
+File: src/com/android/phone/CallFeaturesSetting.java
+
+490
+Mon Dec 01 17:13:09 2014 +0000
+Author: Wink Saville <1001401@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: bfaea591_b8cc5944
+Bytes: 40
+Should probably be sendBroadcastAsUser ?
+
