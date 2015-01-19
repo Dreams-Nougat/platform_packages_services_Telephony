@@ -94,6 +94,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     private static final String VOICEMAIL_SETTING_SCREEN_PREF_KEY = "button_voicemail_category_key";
     private static final String BUTTON_FDN_KEY   = "button_fdn_key";
     private static final String BUTTON_RETRY_KEY       = "button_auto_retry_key";
+    private static final String BUTTON_CALL_BLOCKING_KEY = "button_call_blocking";
     private static final String BUTTON_GSM_UMTS_OPTIONS = "button_gsm_more_expand_key";
     private static final String BUTTON_CDMA_OPTIONS = "button_cdma_more_expand_key";
 
@@ -228,6 +229,10 @@ public class CallFeaturesSetting extends PreferenceActivity
             mButtonAutoRetry = null;
         }
 
+        Preference callBlockingButton = prefSet.findPreference(BUTTON_CALL_BLOCKING_KEY);
+        if (!carrierConfig.getBoolean(CarrierConfigManager.KEY_ENABLE_CALL_BLOCKING_BOOL)) {
+            prefSet.removePreference(callBlockingButton);
+        }
         Preference cdmaOptions = prefSet.findPreference(BUTTON_CDMA_OPTIONS);
         Preference gsmOptions = prefSet.findPreference(BUTTON_GSM_UMTS_OPTIONS);
         if (carrierConfig.getBoolean(CarrierConfigManager.KEY_WORLD_PHONE_BOOL)) {

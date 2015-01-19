@@ -59,6 +59,17 @@
         android:summary="@string/auto_retry_mode_summary"/>
 
     <PreferenceScreen
+        android:key="button_call_blocking"
+        android:title="@string/phone_settings_call_blocking_txt"
+        android:persistent="false">
+
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="com.android.server.telecom"
+            android:targetClass="com.android.server.telecom.settings.CallBlockingSettings" />
+    </PreferenceScreen>
+
+    <PreferenceScreen
         android:key="button_gsm_more_expand_key"
         android:title="@string/labelGSMMore"
         android:summary="@string/sum_gsm_call_settings"
