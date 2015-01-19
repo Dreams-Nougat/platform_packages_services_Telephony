@@ -1308,4 +1308,6 @@
         A SIM card has activated your service and updated your phone\'s roaming capabilities.
     </string>
 
+    <!-- The name of a feature available under the Call settings. -->
+    <string name="phone_settings_call_blocking_txt">Call Blocking</string>
 </resources>
