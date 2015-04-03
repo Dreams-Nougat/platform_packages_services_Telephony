@@ -197,6 +197,7 @@ public class VoicemailSettingsActivity extends PreferenceActivity
     private OmtpVvmCarrierConfigHelper mOmtpVvmCarrierConfigHelper;
 
     private EditPhoneNumberPreference mSubMenuVoicemailSettings;
+    private EditPhoneNumberPreference mOldSubMenuVoicemailSettings = null;
     private VoicemailProviderListPreference mVoicemailProviders;
     private PreferenceScreen mVoicemailSettings;
     private VoicemailRingtonePreference mVoicemailNotificationRingtone;
@@ -294,6 +295,12 @@ public class VoicemailSettingsActivity extends PreferenceActivity
 
         mVoicemailNotificationVibrate.setChecked(
                 VoicemailNotificationSettingsUtil.isVibrationEnabled(mPhone));
+
+        // To handle the case where the activity resumes from background during voicemail number
+        // edit preference being displayed, restore the old preference.
+        if (mOldSubMenuVoicemailSettings != null) {
+            mSubMenuVoicemailSettings = mOldSubMenuVoicemailSettings;
+        }
     }
 
     @Override
@@ -325,6 +332,12 @@ public class VoicemailSettingsActivity extends PreferenceActivity
             if (dialog != null) {
                 dialog.getActionBar().setDisplayHomeAsUpEnabled(false);
             }
+
+            // Keep object reference in mOldSubMenuVoicemailSettings not to lose it in onResume().
+            mSubMenuVoicemailSettings =
+                    (EditPhoneNumberPreference)findPreference(BUTTON_VOICEMAIL_KEY);
+            mOldSubMenuVoicemailSettings = mSubMenuVoicemailSettings;
+            updateVoiceNumberField();
 
             if (preference.getIntent() != null) {
                 if (DBG) log("Invoking cfg intent " + preference.getIntent().getPackage());
