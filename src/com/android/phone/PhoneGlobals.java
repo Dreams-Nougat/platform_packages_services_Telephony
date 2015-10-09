@@ -465,6 +465,11 @@ public class PhoneGlobals extends ContextWrapper {
             audioManager.setParameter(SettingsConstants.HAC_KEY,
                     hac == SettingsConstants.HAC_ENABLED
                             ? SettingsConstants.HAC_VAL_ON : SettingsConstants.HAC_VAL_OFF);
+            if (hac != 0) {
+                Intent hacModeChanged = new Intent(AudioManager.HAC_ENABLED_CHANGE_ACTION);
+                hacModeChanged.putExtra(AudioManager.EXTRA_HAC_ENABLED, true);
+                sendBroadcastAsUser(hacModeChanged, UserHandle.ALL);
+            }
         }
     }
 
