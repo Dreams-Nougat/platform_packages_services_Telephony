@@ -17,8 +17,10 @@
 package com.android.phone.settings;
 
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.UserHandle;
 import android.preference.CheckBoxPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
@@ -131,6 +133,12 @@ public class AccessibilitySettingsFragment extends PreferenceFragment {
             mAudioManager.setParameter(SettingsConstants.HAC_KEY,
                     hac == SettingsConstants.HAC_ENABLED
                             ? SettingsConstants.HAC_VAL_ON : SettingsConstants.HAC_VAL_OFF);
+
+            // Update HAC icon in status bar
+            Intent hacModeChanged = new Intent(AudioManager.HAC_ENABLED_CHANGE_ACTION);
+            hacModeChanged.putExtra(AudioManager.EXTRA_HAC_ENABLED, mButtonHac.isChecked());
+            getContext().sendBroadcastAsUser(hacModeChanged, UserHandle.ALL);
+
             return true;
         }
         return false;
