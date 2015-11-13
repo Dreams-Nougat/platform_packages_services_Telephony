@@ -1308,4 +1308,5 @@
         A SIM card has activated your service and updated your phone\'s roaming capabilities.
     </string>
 
+     <string name="menu_dial_string">Call</string>
 </resources>

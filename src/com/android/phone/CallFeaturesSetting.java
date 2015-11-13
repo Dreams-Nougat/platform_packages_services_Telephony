@@ -109,6 +109,7 @@ public class CallFeaturesSetting extends PreferenceActivity
     private CheckBoxPreference mButtonAutoRetry;
     private PreferenceScreen mVoicemailSettingsScreen;
     private CheckBoxPreference mEnableVideoCalling;
+    private Preference mSdnButton;
 
     /*
      * Click Listeners, handle click based on objects attached to UI.
@@ -122,7 +123,17 @@ public class CallFeaturesSetting extends PreferenceActivity
                     android.provider.Settings.Global.CALL_AUTO_RETRY,
                     mButtonAutoRetry.isChecked() ? 1 : 0);
             return true;
-        }
+        } else if (preference == mSdnButton) {
+            Log.d(LOG_TAG, "onPreferenceTreeClick : mSdnButton is selected.Start activity");
+            PersistableBundle pb =
+                PhoneGlobals.getInstance().getCarrierConfigForSubId(mPhone.getSubId());
+
+            Intent sdnLaunchIntent = new Intent(pb.getString("launch_sdn"));
+            sdnLaunchIntent.addCategory(Intent.CATEGORY_DEFAULT);
+            sdnLaunchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(sdnLaunchIntent);
+            return true;
+       }
         return false;
     }
 
@@ -262,7 +273,17 @@ public class CallFeaturesSetting extends PreferenceActivity
                 }
             }
         }
-
+        if (carrierConfig.getBoolean(CarrierConfigManager.KEY_FDN_DIAL_DIRECTLY_SUPPORTED_BOOL)) {
+            mSdnButton = new Preference(prefSet.getContext());
+            if (mSdnButton != null) {
+                log("SDN feature enabled.");
+                mSdnButton.setTitle(carrierConfig.getString("sdn"));
+                mSdnButton.setSummary(carrierConfig.getString("summary_sdn"));
+                mSdnButton.setPersistent(false);
+                mSdnButton.setSelectable(true);
+                prefSet.addPreference(mSdnButton);
+           }
+       }
         if (ImsManager.isVtEnabledByPlatform(mPhone.getContext()) && ENABLE_VT_FLAG) {
             boolean currentValue =
                     ImsManager.isEnhanced4gLteModeSettingEnabledByUser(mPhone.getContext())
