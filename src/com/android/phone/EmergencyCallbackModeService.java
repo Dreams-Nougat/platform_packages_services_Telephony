@@ -172,6 +172,7 @@ public class EmergencyCallbackModeService extends Service {
         final boolean isInEcm = Boolean.parseBoolean(
                 SystemProperties.get(TelephonyProperties.PROPERTY_INECM_MODE));
         if (!isInEcm) {
+            Log.i(LOG_TAG, "XXX");
             Log.i(LOG_TAG, "Asked to show notification but not in ECM mode");
             if (mTimer != null) {
                 mTimer.cancel();
