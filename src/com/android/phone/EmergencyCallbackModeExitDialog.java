@@ -37,11 +37,14 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemProperties;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
+
+import java.lang.Boolean;
 
 /**
  * Displays dialog that enables users to exit Emergency Callback Mode
@@ -79,8 +82,8 @@ public class EmergencyCallbackModeExitDialog extends Activity implements OnDismi
         super.onCreate(savedInstanceState);
 
         // Check if phone is in Emergency Callback Mode. If not, exit.
-        final boolean isInEcm = Boolean.parseBoolean(
-                SystemProperties.get(TelephonyProperties.PROPERTY_INECM_MODE));
+        final boolean isInEcm = Boolean.parseBoolean(TelephonyManager.getTelephonyProperty(
+                mPhone.getPhoneId(), TelephonyProperties.PROPERTY_INECM_MODE, "false"));
         Log.i(TAG, "ECMModeExitDialog launched - isInEcm: " + isInEcm);
         if (!isInEcm) {
             finish();

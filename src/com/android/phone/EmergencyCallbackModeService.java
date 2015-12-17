@@ -33,6 +33,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.SystemProperties;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.cdma.CDMAPhone;
@@ -169,8 +170,8 @@ public class EmergencyCallbackModeService extends Service {
      * Shows notification for Emergency Callback Mode
      */
     private void showNotification(long millisUntilFinished) {
-        final boolean isInEcm = Boolean.parseBoolean(
-                SystemProperties.get(TelephonyProperties.PROPERTY_INECM_MODE));
+        final boolean isInEcm = Boolean.parseBoolean(TelephonyManager.getTelephonyProperty(
+                mPhone.getPhoneId(), TelephonyProperties.PROPERTY_INECM_MODE, "false"));
         if (!isInEcm) {
             Log.i(LOG_TAG, "Asked to show notification but not in ECM mode");
             if (mTimer != null) {
