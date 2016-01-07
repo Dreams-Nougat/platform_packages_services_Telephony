@@ -1028,6 +1028,7 @@ abstract class TelephonyConnection extends Connection {
                 getPhone().unregisterForOnHoldTone(mHandler);
                 getPhone().unregisterForInCallVoicePrivacyOn(mHandler);
                 getPhone().unregisterForInCallVoicePrivacyOff(mHandler);
+                getPhone().clearDisconnected();
             }
             mOriginalConnection.removePostDialListener(mPostDialListener);
             mOriginalConnection.removeListener(mOriginalConnectionListener);
