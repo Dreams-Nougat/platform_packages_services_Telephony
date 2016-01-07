@@ -656,6 +656,7 @@ abstract class TelephonyConnection extends Connection {
                 getPhone().unregisterForHandoverStateChanged(mHandler);
                 getPhone().unregisterForDisconnect(mHandler);
                 getPhone().unregisterForSuppServiceNotification(mHandler);
+                getPhone().clearDisconnected();
             }
             mOriginalConnection.removePostDialListener(mPostDialListener);
             mOriginalConnection.removeListener(mOriginalConnectionListener);
