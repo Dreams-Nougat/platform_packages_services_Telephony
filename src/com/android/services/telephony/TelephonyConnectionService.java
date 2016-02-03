@@ -107,7 +107,7 @@ public class TelephonyConnectionService extends ConnectionService {
         }
 
         String scheme = handle.getScheme();
-        final String number;
+        String number;
         if (PhoneAccount.SCHEME_VOICEMAIL.equals(scheme)) {
             // TODO: We don't check for SecurityException here (requires
             // CALL_PRIVILEGED permission).
@@ -172,6 +172,22 @@ public class TelephonyConnectionService extends ConnectionService {
         }
 
         boolean isEmergencyNumber = PhoneNumberUtils.isLocalEmergencyNumber(this, number);
+
+        // Convert into emergency number if necessary
+        // This is required in some regions (e.g. Taiwan).
+        if (!isEmergencyNumber && PhoneNumberUtils.isConvertToEmergencyNumberEnabled()) {
+            final Phone phone = getPhoneForAccount(request.getAccountHandle(), false);
+            if (phone == null || phone.getServiceState().getState()
+                    != ServiceState.STATE_IN_SERVICE) {
+                String convertedNumber = PhoneNumberUtils.convertToEmergencyNumber(number);
+                if (!TextUtils.equals(convertedNumber, number)) {
+                    Log.d(this, "onCreateOutgoingConnection, converted to emergency number");
+                    number = convertedNumber;
+                    handle = Uri.fromParts(PhoneAccount.SCHEME_TEL, number, null);
+                    isEmergencyNumber = PhoneNumberUtils.isLocalEmergencyNumber(this, number);
+                }
+            }
+        }
 
         // Get the right phone object from the account data passed in.
         final Phone phone = getPhoneForAccount(request.getAccountHandle(), isEmergencyNumber);
