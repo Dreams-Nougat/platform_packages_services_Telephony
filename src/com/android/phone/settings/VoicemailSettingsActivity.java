@@ -270,6 +270,8 @@ public class VoicemailSettingsActivity extends PreferenceActivity
             prefSet.removePreference(mVoicemailVisualVoicemail);
         }
 
+        if(!mOmtpVvmCarrierConfigHelper.isEnabledByDefault()) { prefSet.removePreference(mVoicemailVisualVoicemail);}
+
         updateVMPreferenceWidgets(mVoicemailProviders.getValue());
 
         // check the intent that started this activity and pop up the voicemail
