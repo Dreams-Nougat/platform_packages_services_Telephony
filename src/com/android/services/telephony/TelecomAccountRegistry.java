@@ -69,6 +69,7 @@ final class TelecomAccountRegistry {
         private boolean mIsVideoCapable;
         private boolean mIsVideoPauseSupported;
         private boolean mIsMergeCallSupported;
+        private boolean mIsHighDefAudioSupported;
 
         AccountEntry(Phone phone, boolean isEmergency, boolean isDummy) {
             mPhone = phone;
@@ -176,6 +177,7 @@ final class TelecomAccountRegistry {
                 capabilities |= PhoneAccount.CAPABILITY_CALL_SUBJECT;
             }
             mIsMergeCallSupported = isCarrierMergeCallSupported();
+            mIsHighDefAudioSupported = isCarrierHighDefAudioSupported();
 
             if (isEmergency && mContext.getResources().getBoolean(
                     R.bool.config_emergency_account_emergency_calls_only)) {
@@ -256,6 +258,19 @@ final class TelecomAccountRegistry {
         }
 
         /**
+         * Determines from carrier config whether high definition audio property is supported.
+         *
+         * @return {@code true} if high definition audio property is supported,
+         *         {@code false} otherwise.
+         */
+        private boolean isCarrierHighDefAudioSupported() {
+            PersistableBundle b =
+                    PhoneGlobals.getInstance().getCarrierConfigForSubId(mPhone.getSubId());
+            return b.getBoolean(
+                    CarrierConfigManager.KEY_SUPPORT_HD_AUDIO_PROPERTY_BOOL);
+        }
+
+        /**
          * Receives callback from {@link PstnPhoneCapabilitiesNotifier} when the video capabilities
          * have changed.
          *
@@ -281,6 +296,15 @@ final class TelecomAccountRegistry {
          */
         public boolean isMergeCallSupported() {
             return mIsMergeCallSupported;
+        }
+
+        /**
+         * Indicates whether this account supports high definition audio property.
+         * @return {@code true} if the account supports high definition audio property,
+         *         {@code false} otherwise.
+         */
+        public boolean isHighDefAudioSupported() {
+            return mIsHighDefAudioSupported;
         }
     }
 
@@ -367,6 +391,22 @@ final class TelecomAccountRegistry {
         for (AccountEntry entry : mAccounts) {
             if (entry.getPhoneAccountHandle().equals(handle)) {
                 return entry.isMergeCallSupported();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determines if the {@link AccountEntry} associated with a {@link PhoneAccountHandle} supports
+     * high definition audio property
+     *
+     * @param handle The {@link PhoneAccountHandle}.
+     * @return {@code True} if high definition audio property is supported.
+     */
+    boolean isHighDefAudioSupported(PhoneAccountHandle handle) {
+        for (AccountEntry entry : mAccounts) {
+            if (entry.getPhoneAccountHandle().equals(handle)) {
+                return entry.isHighDefAudioSupported();
             }
         }
         return false;
