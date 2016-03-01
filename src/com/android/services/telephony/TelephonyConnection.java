@@ -377,6 +377,12 @@ abstract class TelephonyConnection extends Connection {
     private boolean mTreatAsEmergencyCall;
 
     /**
+     * Indicates whether this connection supports high definition audio property.
+     * If false, HD audio property is disabled even if {@link #mHasHighDefAudio} is true.
+     */
+    private boolean mIsHighDefAudioSupported;
+
+    /**
      * For video calls, indicates whether the outgoing video for the call can be paused using
      * the {@link android.telecom.VideoProfile#STATE_PAUSED} VideoState.
      */
@@ -658,7 +664,8 @@ abstract class TelephonyConnection extends Connection {
     protected final void updateConnectionProperties() {
         int newProperties = buildConnectionProperties();
 
-        newProperties = changeBitmask(newProperties, PROPERTY_HIGH_DEF_AUDIO, mHasHighDefAudio);
+        newProperties = changeBitmask(newProperties, PROPERTY_HIGH_DEF_AUDIO,
+                mIsHighDefAudioSupported && mHasHighDefAudio);
         newProperties = changeBitmask(newProperties, PROPERTY_WIFI, mIsWifi);
         newProperties = changeBitmask(newProperties, PROPERTY_IS_EXTERNAL_CALL,
                 isExternalConnection());
@@ -1255,6 +1262,16 @@ abstract class TelephonyConnection extends Connection {
      */
     public void setVideoPauseSupported(boolean isVideoPauseSupported) {
         mIsVideoPauseSupported = isVideoPauseSupported;
+    }
+
+    /**
+     * Sets whether this connection supports high definition audio property.
+     *
+     * @param isHighDefAudioSupported {@code true} if high definition audio property is supported,
+     *                                {@code false} otherwise.
+     */
+    public void setHighDefAudioSupported(boolean isHighDefAudioSupported) {
+        mIsHighDefAudioSupported = isHighDefAudioSupported;
     }
 
     /**
