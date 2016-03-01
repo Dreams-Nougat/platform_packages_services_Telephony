@@ -499,7 +499,10 @@ public class TelephonyConnectionService extends ConnectionService {
                             phoneAccountHandle));
             returnConnection.setConferenceSupported(
                     TelecomAccountRegistry.getInstance(this).isMergeCallSupported(
-                            phoneAccountHandle));
+                            phoneAccountHandle)
+                    && (!returnConnection.isImsConnection()
+                            || TelecomAccountRegistry.getInstance(this).isMergeImsCallSupported(
+                                    phoneAccountHandle)));
         }
         return returnConnection;
     }
