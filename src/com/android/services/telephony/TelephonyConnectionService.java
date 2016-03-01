@@ -500,6 +500,9 @@ public class TelephonyConnectionService extends ConnectionService {
             returnConnection.setConferenceSupported(
                     TelecomAccountRegistry.getInstance(this).isMergeCallSupported(
                             phoneAccountHandle));
+            returnConnection.setHighDefAudioSupported(
+                    TelecomAccountRegistry.getInstance(this).isHighDefAudioSupported(
+                            phoneAccountHandle));
         }
         return returnConnection;
     }
