@@ -567,6 +567,9 @@ public class TelephonyConnectionService extends ConnectionService {
             returnConnection.setConferenceSupported(!isEmergencyCall
                     && TelecomAccountRegistry.getInstance(this).isMergeCallSupported(
                             phoneAccountHandle));
+            returnConnection.setPreciseFailedCauseSupported(
+                    TelecomAccountRegistry.getInstance(this).isPreciseFailedCauseSupported(
+                            phoneAccountHandle));
         }
         return returnConnection;
     }

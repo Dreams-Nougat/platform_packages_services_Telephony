@@ -71,6 +71,7 @@ final class TelecomAccountRegistry {
         private boolean mIsVideoPresenceSupported;
         private boolean mIsVideoPauseSupported;
         private boolean mIsMergeCallSupported;
+        private boolean mIsPreciseFailedCauseSupported;
 
         AccountEntry(Phone phone, boolean isEmergency, boolean isDummy) {
             mPhone = phone;
@@ -189,6 +190,7 @@ final class TelecomAccountRegistry {
                 instantLetteringExtras = getPhoneAccountExtras();
             }
             mIsMergeCallSupported = isCarrierMergeCallSupported();
+            mIsPreciseFailedCauseSupported = isCarrierPreciseFailedCauseSupported();
 
             if (isEmergency && mContext.getResources().getBoolean(
                     R.bool.config_emergency_account_emergency_calls_only)) {
@@ -313,6 +315,19 @@ final class TelecomAccountRegistry {
         }
 
         /**
+         * Determines from carrier config whether showing percise call diconnect cause to user
+         * is supported.
+         *
+         * @return {@code true} if showing percise call diconnect cause to user is supported,
+         * {@code false} otherwise.
+         */
+        private boolean isCarrierPreciseFailedCauseSupported() {
+            PersistableBundle b =
+                    PhoneGlobals.getInstance().getCarrierConfigForSubId(mPhone.getSubId());
+            return b.getBoolean(CarrierConfigManager.KEY_SUPPORT_PRECISE_FAILED_CAUSE_BOOL);
+        }
+
+        /**
          * Receives callback from {@link PstnPhoneCapabilitiesNotifier} when the video capabilities
          * have changed.
          *
@@ -338,6 +353,16 @@ final class TelecomAccountRegistry {
          */
         public boolean isMergeCallSupported() {
             return mIsMergeCallSupported;
+        }
+
+        /**
+         * Indicates whether this account supports showing the precise call disconnect cause
+         * to user (i.e. conferencing).
+         * @return {@code true} if the account supports showing the precise call disconnect
+         * cause, {@code false} otherwise.
+         */
+        public boolean isPreciseFailedCauseSupported() {
+            return mIsPreciseFailedCauseSupported;
         }
     }
 
@@ -434,6 +459,22 @@ final class TelecomAccountRegistry {
      */
     SubscriptionManager getSubscriptionManager() {
         return mSubscriptionManager;
+    }
+
+    /**
+     * Determines if the {@link AccountEntry} associated with a {@link PhoneAccountHandle} supports
+     * showing precise call disconnect cause to the user.
+     *
+     * @param handle The {@link PhoneAccountHandle}.
+     * @return {@code True} if showing precise call disconnect cause to the user is supported.
+     */
+    boolean isPreciseFailedCauseSupported(PhoneAccountHandle handle) {
+        for (AccountEntry entry : mAccounts) {
+            if (entry.getPhoneAccountHandle().equals(handle)) {
+                return entry.isPreciseFailedCauseSupported();
+            }
+        }
+        return false;
     }
 
     /**

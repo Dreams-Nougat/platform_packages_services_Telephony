@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2016 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- Call failed messages -->
+    <!-- In-call screen: call failure reason (Cause Number 1) -->
+    <string name="clh_callFailed_unassigned_number_txt">Numero no esta en uso</string>
+    <!-- In-call screen: call failure reason (Cause Number 3) -->
+    <string name="clh_callFailed_no_route_to_destination_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 6) -->
+    <string name="clh_callFailed_channel_unacceptable_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 8) -->
+    <string name="clh_callFailed_operator_determined_barring_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 16) -->
+    <string name="clh_callFailed_normal_call_clearing_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 17) -->
+    <string name="clh_callFailed_user_busy_txt">Numero ocupado</string>
+    <!-- In-call screen: call failure reason (Cause Number 18) -->
+    <string name="clh_callFailed_no_user_responding_txt">No hay respuesta</string>
+    <!-- In-call screen: call failure reason (Cause Number 19) -->
+    <string name="clh_callFailed_user_alerting_txt">Usuario no contesta</string>
+    <!-- In-call screen: call failure reason (Cause Number 21) -->
+    <string name="clh_callFailed_call_rejected_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 22) -->
+    <string name="clh_callFailed_number_changed_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 25) -->
+    <string name="clh_callFailed_pre_emption_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 26) -->
+    <string name="clh_callFailed_non_selected_user_clearing_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 27) -->
+    <string name="clh_callFailed_destination_out_of_order_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 28) -->
+    <string name="clh_callFailed_invalid_number_format_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 29) -->
+    <string name="clh_callFailed_facility_rejected_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 30) -->
+    <string name="clh_callFailed_response_to_STATUS_ENQUIRY_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 31) -->
+    <string name="clh_callFailed_normal_unspecified_txt">Llamada terminada</string>
+    <!-- In-call screen: call failure reason (Cause Number 34) -->
+    <string name="clh_callFailed_no_circuit_available_txt">Red ocupada / No conecta</string>
+    <!-- In-call screen: call failure reason (Cause Number 38) -->
+    <string name="clh_callFailed_network_out_of_order_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 41) -->
+    <string name="clh_callFailed_temporary_failure_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 42) -->
+    <string name="clh_callFailed_switching_equipment_congestion_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 43) -->
+    <string name="clh_callFailed_access_information_discarded_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 44) -->
+    <string name="clh_callFailed_requested_circuit_txt">Red ocupada / No conecta</string>
+    <!-- In-call screen: call failure reason (Cause Number 47) -->
+    <string name="clh_callFailed_resources_unavailable_unspecified_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 49) -->
+    <string name="clh_callFailed_quality_of_service_unavailable_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 50) -->
+    <string name="clh_callFailed_requested_facility_not_subscribed_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 55) -->
+    <string name="clh_callFailed_incoming_calls_barred_within_the_CUG_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 57) -->
+    <string name="clh_callFailed_bearer_capability_not_authorized_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 58) -->
+    <string name="clh_callFailed_bearer_capability_not_presently_available_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 63) -->
+    <string name="clh_callFailed_service_or_option_not_available_unspecified_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 65) -->
+    <string name="clh_callFailed_bearer_service_not_implemented_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 68) -->
+    <string name="clh_callFailed_ACM_equal_to_or_greater_than_ACMmax_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 69) -->
+    <string name="clh_callFailed_requested_facility_not_implemented_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 70) -->
+    <string name="clh_callFailed_only_restricted_digital_information_bearer_capability_is_available_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 79) -->
+    <string name="clh_callFailed_service_or_option_not_implemented_unspecified_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 81) -->
+    <string name="clh_callFailed_invalid_transaction_identifier_value_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 87) -->
+    <string name="clh_callFailed_user_not_member_of_CUG_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 88) -->
+    <string name="clh_callFailed_incompatible_destination_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 91) -->
+    <string name="clh_callFailed_invalid_transit_network_selection_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 95) -->
+    <string name="clh_callFailed_semantically_incorrect_message_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 96) -->
+    <string name="clh_callFailed_invalid_mandatory_information_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 97) -->
+    <string name="clh_callFailed_message_type_non_existent_or_not_implemented_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 98) -->
+    <string name="clh_callFailed_message_type_not_compatible_with_protocol_state_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 99) -->
+    <string name="clh_callFailed_information_element_non_existent_or_not_implemented_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 100) -->
+    <string name="clh_callFailed_conditional_IE_error_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 101) -->
+    <string name="clh_callFailed_message_not_compatible_with_protocol_state_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 102) -->
+    <string name="clh_callFailed_recovery_on_timer_expiry_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 111) -->
+    <string name="clh_callFailed_protocol_Error_unspecified_txt"></string>
+    <!-- In-call screen: call failure reason (Cause Number 127) -->
+    <string name="clh_callFailed_interworking_unspecified_txt"></string>
+
+</resources>
