@@ -138,7 +138,11 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     private static final int EVENT_PERFORM_NETWORK_SCAN_DONE = 40;
     private static final int CMD_SET_NETWORK_SELECTION_MODE_MANUAL = 41;
     private static final int EVENT_SET_NETWORK_SELECTION_MODE_MANUAL_DONE = 42;
-
+    /*Add for invokeOemRequest  by phoneId @{ */
+    private static final int CMD_INVOKE_OEM_RIL_REQUEST_RAW_BY_PHONEID = 43;
+    private static final int CMD_INVOKE_OEM_RIL_REQUEST_STRINGS = 44;
+    private static final int EVENT_INVOKE_OEM_RIL_REQUEST_STRINGS_DONE = 45;
+    /* @} */
     /** The singleton instance. */
     private static PhoneInterfaceManager sInstance;
 
@@ -746,7 +750,43 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                         request.notifyAll();
                     }
                     break;
+                /*Add for invokeOemRequest by phoneId @{ */
+                case CMD_INVOKE_OEM_RIL_REQUEST_RAW_BY_PHONEID:
+                    request = (MainThreadRequest)msg.obj;
+                    onCompleted = obtainMessage(EVENT_INVOKE_OEM_RIL_REQUEST_RAW_DONE, request);
+                    //get request.subId as phoneId
+                    phone = PhoneFactory.getPhone(request.subId);
+                    if(phone == null) {
+                        loge("invokeOemHookRaw get phone by phoneId failed,use mPhone");
+                        phone =mPhone;
+                    }
+                    phone.invokeOemRilRequestRaw((byte[])request.argument,
+                            onCompleted);
 
+                    break;
+
+                case CMD_INVOKE_OEM_RIL_REQUEST_STRINGS:
+                    request = (MainThreadRequest)msg.obj;
+                    onCompleted = obtainMessage(EVENT_INVOKE_OEM_RIL_REQUEST_STRINGS_DONE, request);
+                    //get request.subId as phoneId
+                    phone = PhoneFactory.getPhone(request.subId);
+                    if(phone == null) {
+                        loge("invokeOemHookStrings get phone by phoneId failed,use mPhone");
+                        phone =mPhone;
+                    }
+                    phone.invokeOemRilRequestStrings((String[])request.argument,
+                            onCompleted);
+                    break;
+
+                case EVENT_INVOKE_OEM_RIL_REQUEST_STRINGS_DONE:
+                    ar = (AsyncResult)msg.obj;
+                    request = (MainThreadRequest)ar.userObj;
+                    request.result = ar;
+                    synchronized (request) {
+                        request.notifyAll();
+                    }
+                    break;
+                /* @} */
                 default:
                     Log.w(LOG_TAG, "MainThreadHandler: unexpected message code: " + msg.what);
                     break;
@@ -2880,4 +2920,73 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     public ModemActivityInfo getModemActivityInfo() {
         return (ModemActivityInfo) sendRequest(CMD_GET_MODEM_ACTIVITY_INFO, null);
     }
+
+
+    /**
+     * Add invokeOemRilRequest by phoneId. @{
+     */
+    @Override
+    public int invokeOemRilRequestRawByPhoneId(int phoneId, byte[] oemReq, byte[] oemResp) {
+        enforceModifyPermission();
+        if (DBG) log("invokeOemRilRequestRawByPhoneId "+ phoneId);
+        int returnValue = 0;
+        try {
+            AsyncResult result = (AsyncResult)sendRequest(CMD_INVOKE_OEM_RIL_REQUEST_RAW_BY_PHONEID, oemReq, phoneId);
+            if(result.exception == null) {
+                if (result.result != null) {
+                    byte[] responseData = (byte[])(result.result);
+                    if(responseData.length > oemResp.length) {
+                        Log.w(LOG_TAG, "Buffer to copy response too small: Response length is " +
+                                responseData.length +  "bytes. Buffer Size is " +
+                                oemResp.length + "bytes.");
+                    }
+                    System.arraycopy(responseData, 0, oemResp, 0, responseData.length);
+                    returnValue = responseData.length;
+                }
+            } else {
+                CommandException ex = (CommandException) result.exception;
+                returnValue = ex.getCommandError().ordinal();
+                if(returnValue > 0) returnValue *= -1;
+            }
+        } catch (RuntimeException e) {
+            Log.w(LOG_TAG, "sendOemRilRequestRaw: Runtime Exception");
+            returnValue = (CommandException.Error.GENERIC_FAILURE.ordinal());
+            if(returnValue > 0) returnValue *= -1;
+        }
+
+        return returnValue;
+    }
+
+    @Override
+    public int invokeOemRilRequestStrings(int phoneId, String[] oemReq, String[] oemResp) {
+        enforceModifyPermission();
+        if (DBG) log("invokeOemRilRequestStrings "+ phoneId);
+        int returnValue = 0;
+        try {
+            AsyncResult result = (AsyncResult)sendRequest(CMD_INVOKE_OEM_RIL_REQUEST_STRINGS, oemReq, phoneId);
+            if(result.exception == null) {
+                if (result.result != null) {
+                    String[] responseData = (String[])(result.result);
+                    if(responseData.length > oemResp.length) {
+                        Log.w(LOG_TAG, "Buffer to copy response too small: Response length is " +
+                                responseData.length +  "bytes. Buffer Size is " +
+                                oemResp.length + "bytes.");
+                    }
+                    System.arraycopy(responseData, 0, oemResp, 0, responseData.length);
+                    returnValue = responseData.length;
+                }
+            } else {
+                CommandException ex = (CommandException) result.exception;
+                returnValue = ex.getCommandError().ordinal();
+                if(returnValue > 0) returnValue *= -1;
+            }
+        } catch (RuntimeException e) {
+            Log.w(LOG_TAG, "sendOemRilRequestRaw: Runtime Exception");
+            returnValue = (CommandException.Error.GENERIC_FAILURE.ordinal());
+            if(returnValue > 0) returnValue *= -1;
+        }
+
+        return returnValue;
+    }
+    /** @} */
 }
