@@ -1,0 +1,11 @@
+Revision: 170013c2927876c9a2ad41e3cc1b3ce8c82fc3cf
+Patch-set: 2
+File: src/com/android/phone/EmergencyDialer.java
+
+532
+Mon Apr 11 23:28:30 2016 +0000
+Author: Hall Liu <1087703@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 0ba96e5f_6727cc4c
+Bytes: 91
+Please check that there are no SIMs in service before converting the emergency number here.
+
