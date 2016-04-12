@@ -9,3 +9,12 @@ UUID: 0ba96e5f_6727cc4c
 Bytes: 91
 Please check that there are no SIMs in service before converting the emergency number here.
 
+532
+Tue Apr 12 05:01:40 2016 +0000
+Author: Hidenari Koshimae <1022419@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 0ba96e5f_6727cc4c
+UUID: 0ba96e5f_6d000d9f
+Bytes: 218
+We must not check no SIMs when dialing from emergency dialer. This is operator requirement.
+Otherwise, conversion does not take place in case of screen lock (Pattern, PIN, password) and dialing is rejected undesirably.
+
