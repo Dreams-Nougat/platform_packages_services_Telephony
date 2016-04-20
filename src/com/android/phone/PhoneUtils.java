@@ -2451,7 +2451,7 @@ public class PhoneUtils {
         return new ComponentName(PhoneGlobals.getInstance(), TelephonyConnectionService.class);
     }
 
-    private static Phone getPhoneFromIccId(String iccId) {
+    public static Phone getPhoneFromIccId(String iccId) {
         if (!TextUtils.isEmpty(iccId)) {
             for (Phone phone : PhoneFactory.getPhones()) {
                 String phoneIccId = phone.getIccSerialNumber();
