@@ -496,12 +496,14 @@ final class TelecomAccountRegistry {
 
             String phoneAccountId = defaultPhoneAccount.getId();
             if (!TextUtils.isEmpty(phoneAccountId) && TextUtils.isDigitsOnly(phoneAccountId)) {
-                PhoneAccountHandle upgradedPhoneAccount =
-                        PhoneUtils.makePstnPhoneAccountHandle(
-                                PhoneGlobals.getPhone(Integer.parseInt(phoneAccountId)));
+                Phone phone = PhoneUtils.getPhoneFromIccId(phoneAccountId);
+                if (phone != null) {
+                    PhoneAccountHandle upgradedPhoneAccount =
+                            PhoneUtils.makePstnPhoneAccountHandle(phone);
 
-                if (hasAccountEntryForPhoneAccount(upgradedPhoneAccount)) {
-                    mTelecomManager.setUserSelectedOutgoingPhoneAccount(upgradedPhoneAccount);
+                    if (hasAccountEntryForPhoneAccount(upgradedPhoneAccount)) {
+                        mTelecomManager.setUserSelectedOutgoingPhoneAccount(upgradedPhoneAccount);
+                    }
                 }
             }
         }
