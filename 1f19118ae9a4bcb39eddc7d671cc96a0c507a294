@@ -1,0 +1,18 @@
+Revision: 1f19118ae9a4bcb39eddc7d671cc96a0c507a294
+Patch-set: 1
+File: src/com/android/services/telephony/TelecomAccountRegistry.java
+
+484:0-487:47
+Thu Apr 21 18:09:37 2016 +0000
+Author: Santos Cordon <1015328@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: a86ea878_464c836d
+Bytes: 135
+This code was written specifically to read in old accounts that may still use a sub ID.  We *should* be reading the subId in this case.
+
+498:64-498:76
+Thu Apr 21 18:09:37 2016 +0000
+Author: Santos Cordon <1015328@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: a86ea878_6649875c
+Bytes: 143
+We check to see that the ID is pure numbers before parsing it so there shouldn't be a NumberFormatException.  In what case are you seeing this?
+
