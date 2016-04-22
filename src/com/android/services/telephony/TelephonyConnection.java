@@ -334,6 +334,12 @@ abstract class TelephonyConnection extends Connection {
     private boolean mIsConferenceSupported;
 
     /**
+     * Indicates whether managing conference call is supported after this connection being
+     * a part of a conference.
+     */
+    private boolean mIsManageConferenceCallSupported;
+
+    /**
      * Listeners to our TelephonyConnection specific callbacks
      */
     private final Set<TelephonyConnectionListener> mTelephonyListeners = Collections.newSetFromMap(
@@ -1085,6 +1091,26 @@ abstract class TelephonyConnection extends Connection {
      */
     public boolean isConferenceSupported() {
         return mIsConferenceSupported;
+    }
+
+    /**
+     * Sets whether managing conference call is supported after this connection being a part of a
+     * conference.
+     *
+     * @param isManageConferenceCallSupported {@code true} if manage conference calling is supported
+     *        after this connection being a part of a conference,
+     *        {@code false} otherwise.
+     */
+    public void setManageConferenceSupported(boolean isManageConferenceCallSupported) {
+        mIsManageConferenceCallSupported = isManageConferenceCallSupported;
+    }
+
+    /**
+     * @return {@code true} if manage conference calling is supported after this connection being a
+     * part of a conference.
+     */
+    public boolean isManageConferenceCallSupported() {
+        return mIsManageConferenceCallSupported;
     }
 
     /**
