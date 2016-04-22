@@ -104,6 +104,8 @@ abstract class TelephonyConnection extends Connection {
                                             + " with " + connection.toString());
                             setOriginalConnection(connection);
                             mWasImsConnection = false;
+                            // For non-Ims call, mark manage conference supported flag as true
+                            setManageConferenceSupported(true);
                         }
                     } else {
                         Log.w(TelephonyConnection.this,
@@ -386,6 +388,12 @@ abstract class TelephonyConnection extends Connection {
      * Indicates whether this connection supports being a part of a conference..
      */
     private boolean mIsConferenceSupported;
+
+    /**
+     * Indicates whether managing conference call is supported after this connection being
+     * a part of a conference.
+     */
+    private boolean mIsManageConferenceCallSupported;
 
     /**
      * Listeners to our TelephonyConnection specific callbacks
@@ -1271,6 +1279,26 @@ abstract class TelephonyConnection extends Connection {
      */
     public boolean isConferenceSupported() {
         return mIsConferenceSupported;
+    }
+
+    /**
+     * Sets whether managing conference call is supported after this connection being a part of a
+     * conference.
+     *
+     * @param isManageConferenceCallSupported {@code true} if manage conference calling is supported
+     *        after this connection being a part of a conference,
+     *        {@code false} otherwise.
+     */
+    public void setManageConferenceSupported(boolean isManageConferenceCallSupported) {
+        mIsManageConferenceCallSupported = isManageConferenceCallSupported;
+    }
+
+    /**
+     * @return {@code true} if manage conference calling is supported after this connection being a
+     * part of a conference.
+     */
+    public boolean isManageConferenceCallSupported() {
+        return mIsManageConferenceCallSupported;
     }
 
     /**

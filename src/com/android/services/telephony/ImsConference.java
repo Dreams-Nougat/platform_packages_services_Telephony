@@ -524,7 +524,9 @@ public class ImsConference extends Conference {
      */
     private void updateManageConference() {
         boolean couldManageConference = can(Connection.CAPABILITY_MANAGE_CONFERENCE);
-        boolean canManageConference = !mConferenceParticipantConnections.isEmpty();
+        boolean canManageConference = mConferenceHost != null
+                && mConferenceHost.isManageConferenceCallSupported()
+                && !mConferenceParticipantConnections.isEmpty();
         Log.v(this, "updateManageConference was :%s is:%s", couldManageConference ? "Y" : "N",
                 canManageConference ? "Y" : "N");
 

@@ -320,6 +320,8 @@ public class ImsConferenceController {
         // This is necessary since the Connection Service does not support removing a connection
         // from Telecom.  Instead we create a new instance and remove the old one from telecom.
         TelephonyConnection conferenceHostConnection = connection.cloneConnection();
+        conferenceHostConnection.setManageConferenceSupported(
+                connection.isManageConferenceCallSupported());
 
         PhoneAccountHandle phoneAccountHandle = null;
 

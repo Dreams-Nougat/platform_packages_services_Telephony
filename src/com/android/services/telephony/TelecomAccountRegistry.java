@@ -71,6 +71,7 @@ final class TelecomAccountRegistry {
         private boolean mIsVideoPresenceSupported;
         private boolean mIsVideoPauseSupported;
         private boolean mIsMergeCallSupported;
+        private boolean mIsManageImsConferenceCallSupported;
 
         AccountEntry(Phone phone, boolean isEmergency, boolean isDummy) {
             mPhone = phone;
@@ -189,6 +190,7 @@ final class TelecomAccountRegistry {
                 instantLetteringExtras = getPhoneAccountExtras();
             }
             mIsMergeCallSupported = isCarrierMergeCallSupported();
+            mIsManageImsConferenceCallSupported = isCarrierManageImsConferenceCallSupported();
 
             if (isEmergency && mContext.getResources().getBoolean(
                     R.bool.config_emergency_account_emergency_calls_only)) {
@@ -293,6 +295,18 @@ final class TelecomAccountRegistry {
         }
 
         /**
+         * Determines from carrier config whether managing IMS conference calls is supported.
+         *
+         * @return {@code true} if managing IMS conference calls is supported,
+         *         {@code false} otherwise.
+         */
+        private boolean isCarrierManageImsConferenceCallSupported() {
+            PersistableBundle b =
+                    PhoneGlobals.getInstance().getCarrierConfigForSubId(mPhone.getSubId());
+            return b.getBoolean(CarrierConfigManager.KEY_SUPPORT_MANAGE_IMS_CONFERENCE_CALL_BOOL);
+        }
+
+        /**
          * @return The {@linke PhoneAccount} extras associated with the current subscription.
          */
         private Bundle getPhoneAccountExtras() {
@@ -338,6 +352,15 @@ final class TelecomAccountRegistry {
          */
         public boolean isMergeCallSupported() {
             return mIsMergeCallSupported;
+        }
+
+        /**
+         * Indicates whether this account supports managing IMS conference calls
+         * @return {@code true} if the account supports managing IMS conference calls,
+         *         {@code false} otherwise.
+         */
+        public boolean isManageImsConferenceCallSupported() {
+            return mIsManageImsConferenceCallSupported;
         }
     }
 
@@ -424,6 +447,22 @@ final class TelecomAccountRegistry {
         for (AccountEntry entry : mAccounts) {
             if (entry.getPhoneAccountHandle().equals(handle)) {
                 return entry.isMergeCallSupported();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determines if the {@link AccountEntry} associated with a {@link PhoneAccountHandle} supports
+     * managing IMS conference calls.
+     *
+     * @param handle The {@link PhoneAccountHandle}.
+     * @return {@code True} if managing IMS conference calls is supported.
+     */
+    boolean isManageImsConferenceCallSupported(PhoneAccountHandle handle) {
+        for (AccountEntry entry : mAccounts) {
+            if (entry.getPhoneAccountHandle().equals(handle)) {
+                return entry.isManageImsConferenceCallSupported();
             }
         }
         return false;
