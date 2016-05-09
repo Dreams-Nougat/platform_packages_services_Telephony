@@ -218,4 +218,17 @@
 
     <!-- Whether the emergency only account can make emergency calls -->
     <bool name="config_pstnCanPlaceEmergencyCalls">true</bool>
+
+    <!-- This config holds the auto switching rules of WFC mode based on roaming state.
+         This should be configured as int array whose length is 2:
+         (1) {@link com.android.phone.WfcModeAutomaticSwitcher#WFC_MODE_AUTO_SWITCH_HOME_INDEX}
+             indicates the WFC mode to be set when device is under home network coverage.
+             The possible value should be either of the followings:
+             {@link ImsConfig.WfcModeFeatureValueConstants.WIFI_ONLY}
+             {@link ImsConfig.WfcModeFeatureValueConstants.CELLULAR_PREFERRED}
+             {@link ImsConfig.WfcModeFeatureValueConstants.WIFI_PREFERRED}
+         (2) {@link com.android.phone.WfcModeAutomaticSwitcher#WFC_MODE_AUTO_SWITCH_ROAMING_INDEX}
+             indicates the WFC mode to be set when device is during roaming.
+             The possible value should be same as above. -->
+    <integer-array name="wfc_mode_auto_switch_int_array" translatable="false" />
 </resources>

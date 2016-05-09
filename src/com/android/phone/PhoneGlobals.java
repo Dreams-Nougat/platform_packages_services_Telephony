@@ -440,6 +440,9 @@ public class PhoneGlobals extends ContextWrapper {
                     hac == SettingsConstants.HAC_ENABLED
                             ? SettingsConstants.HAC_VAL_ON : SettingsConstants.HAC_VAL_OFF);
         }
+
+        // Create an instance of WFC switcher to react on Home / Roaming changes if config is valid
+        WfcModeAutomaticSwitcher.init(this);
     }
 
     /**
