@@ -336,18 +336,15 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                 case EVENT_TRANSMIT_APDU_LOGICAL_CHANNEL_DONE:
                     ar = (AsyncResult) msg.obj;
                     request = (MainThreadRequest) ar.userObj;
-                    if (ar.exception == null && ar.result != null) {
-                        request.result = ar.result;
-                    } else {
+                    request.result = ar.result;
+                    if (ar.result == null) {
+                        loge("iccTransmitApduLogicalChannel: Empty response");
                         request.result = new IccIoResult(0x6F, 0, (byte[])null);
-                        if (ar.result == null) {
-                            loge("iccTransmitApduLogicalChannel: Empty response");
-                        } else if (ar.exception instanceof CommandException) {
-                            loge("iccTransmitApduLogicalChannel: CommandException: " +
-                                    ar.exception);
-                        } else {
-                            loge("iccTransmitApduLogicalChannel: Unknown exception");
-                        }
+                    } else if (ar.exception instanceof CommandException) {
+                        loge("iccTransmitApduLogicalChannel: CommandException: " +
+                                ar.exception);
+                    } else if(ar.exception !=null){
+                        loge("iccTransmitApduLogicalChannel: Unknown exception");
                     }
                     synchronized (request) {
                         request.notifyAll();
@@ -375,18 +372,15 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                 case EVENT_TRANSMIT_APDU_BASIC_CHANNEL_DONE:
                     ar = (AsyncResult) msg.obj;
                     request = (MainThreadRequest) ar.userObj;
-                    if (ar.exception == null && ar.result != null) {
-                        request.result = ar.result;
-                    } else {
+                    request.result = ar.result;
+                    if (ar.result == null) {
+                        loge("iccTransmitApduBasicChannel: Empty response");
                         request.result = new IccIoResult(0x6F, 0, (byte[])null);
-                        if (ar.result == null) {
-                            loge("iccTransmitApduBasicChannel: Empty response");
-                        } else if (ar.exception instanceof CommandException) {
-                            loge("iccTransmitApduBasicChannel: CommandException: " +
-                                    ar.exception);
-                        } else {
-                            loge("iccTransmitApduBasicChannel: Unknown exception");
-                        }
+                    } else if (ar.exception instanceof CommandException) {
+                        loge("iccTransmitApduBasicChannel: CommandException: " +
+                                ar.exception);
+                    } else if(ar.exception !=null){
+                        loge("iccTransmitApduBasicChannel: Unknown exception");
                     }
                     synchronized (request) {
                         request.notifyAll();
@@ -414,9 +408,8 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                 case EVENT_EXCHANGE_SIM_IO_DONE:
                     ar = (AsyncResult) msg.obj;
                     request = (MainThreadRequest) ar.userObj;
-                    if (ar.exception == null && ar.result != null) {
-                        request.result = ar.result;
-                    } else {
+                    request.result = ar.result;
+                    if (ar.result == null) {
                         request.result = new IccIoResult(0x6f, 0, (byte[])null);
                     }
                     synchronized (request) {
@@ -477,9 +470,30 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                     ar = (AsyncResult) msg.obj;
                     request = (MainThreadRequest) ar.userObj;
                     IccOpenLogicalChannelResponse openChannelResp;
-                    if (ar.exception == null && ar.result != null) {
+                    if (ar.exception instanceof CommandException) {
+                        CommandException.Error error = ((CommandException) (ar.exception))
+                                .getCommandError();
+                        int errorCode = IccOpenLogicalChannelResponse.STATUS_UNKNOWN_ERROR;
+                        if (error == CommandException.Error.MISSING_RESOURCE) {
+                            errorCode = IccOpenLogicalChannelResponse.STATUS_MISSING_RESOURCE;
+                        } else if (error == CommandException.Error.NO_SUCH_ELEMENT) {
+                            errorCode = IccOpenLogicalChannelResponse.STATUS_NO_SUCH_ELEMENT;
+                        }
+                    }
+                    if (ar.result == null) {
+                        int errorCode = IccOpenLogicalChannelResponse.STATUS_UNKNOWN_ERROR;
+                        if (ar.exception == null) {
+                            loge("iccOpenLogicalChannel: Empty response");
+                        }else {
+                            loge("iccOpenLogicalChannel: Exception: " + ar.exception);
+                        }
+                        openChannelResp = new IccOpenLogicalChannelResponse(
+                                IccOpenLogicalChannelResponse.INVALID_CHANNEL,
+                                errorCode, null);
+                    } else {
                         int[] result = (int[]) ar.result;
                         int channelId = result[0];
+                        int errorCode = IccOpenLogicalChannelResponse.STATUS_UNKNOWN_ERROR;
                         byte[] selectResponse = null;
                         if (result.length > 1) {
                             selectResponse = new byte[result.length - 1];
@@ -487,28 +501,15 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
                                 selectResponse[i - 1] = (byte) result[i];
                             }
                         }
-                        openChannelResp = new IccOpenLogicalChannelResponse(channelId,
-                            IccOpenLogicalChannelResponse.STATUS_NO_ERROR, selectResponse);
-                    } else {
-                        if (ar.result == null) {
-                            loge("iccOpenLogicalChannel: Empty response");
-                        }
-                        if (ar.exception != null) {
+                        if(ar.exception != null){
                             loge("iccOpenLogicalChannel: Exception: " + ar.exception);
+                            openChannelResp = new IccOpenLogicalChannelResponse(
+                                    channelId, errorCode, selectResponse);
+                        } else {
+                            openChannelResp = new IccOpenLogicalChannelResponse(
+                                    channelId, IccOpenLogicalChannelResponse.STATUS_NO_ERROR,
+                                    selectResponse);
                         }
-
-                        int errorCode = IccOpenLogicalChannelResponse.STATUS_UNKNOWN_ERROR;
-                        if (ar.exception instanceof CommandException) {
-                            CommandException.Error error =
-                                ((CommandException) (ar.exception)).getCommandError();
-                            if (error == CommandException.Error.MISSING_RESOURCE) {
-                                errorCode = IccOpenLogicalChannelResponse.STATUS_MISSING_RESOURCE;
-                            } else if (error == CommandException.Error.NO_SUCH_ELEMENT) {
-                                errorCode = IccOpenLogicalChannelResponse.STATUS_NO_SUCH_ELEMENT;
-                            }
-                        }
-                        openChannelResp = new IccOpenLogicalChannelResponse(
-                            IccOpenLogicalChannelResponse.INVALID_CHANNEL, errorCode, null);
                     }
                     request.result = openChannelResp;
                     synchronized (request) {
