@@ -672,7 +672,7 @@ abstract class TelephonyConnection extends Connection {
         updateConnectionCapabilities();
         updateConnectionProperties();
         if (mOriginalConnection != null) {
-            Uri address = getAddressFromNumber(mOriginalConnection.getAddress());
+            Uri address = getAddressFromOriginalConnection();
             int presentation = mOriginalConnection.getNumberPresentation();
             if (!Objects.equals(address, getAddress()) ||
                     presentation != getAddressPresentation()) {
@@ -692,6 +692,18 @@ abstract class TelephonyConnection extends Connection {
                 mTreatAsEmergencyCall = true;
             }
         }
+    }
+
+    private Uri getAddressFromOriginalConnection() {
+        String number = mOriginalConnection.getAddress();
+
+        // For MO call, use original dial string to show subaddress info in InCallUI.
+        // Some operator requires this behavior.
+        if (!mOriginalConnection.isIncoming()) {
+            number = PhoneNumberUtils.extractNetworkPortionAlt(
+                    mOriginalConnection.getOrigDialString());
+        }
+        return getAddressFromNumber(number);
     }
 
     void onRemovedFromCallService() {
