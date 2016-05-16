@@ -579,7 +579,12 @@ abstract class TelephonyConnection extends Connection {
     protected final void updateAddress() {
         updateConnectionCapabilities();
         if (mOriginalConnection != null) {
-            Uri address = getAddressFromNumber(mOriginalConnection.getAddress());
+            Uri address;
+            if (getAddress() != null && !mOriginalConnection.isIncoming()) {
+                address = getAddressFromNumber(mOriginalConnection.getOrigDialString());
+            } else {
+                address = getAddressFromNumber(mOriginalConnection.getAddress());
+            }
             int presentation = mOriginalConnection.getNumberPresentation();
             if (!Objects.equals(address, getAddress()) ||
                     presentation != getAddressPresentation()) {
