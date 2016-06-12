@@ -686,6 +686,12 @@ abstract class TelephonyConnection extends Connection {
             } catch (CallStateException e) {
                 Log.e(this, e, "Call to Connection.hangup failed with exception");
             }
+        } else {
+            // Hanging-up outgoing calls which have not been initialized yet.
+            setDisconnected(DisconnectCauseUtil.toTelecomDisconnectCause(
+                    telephonyDisconnectCode,
+                    "MO(INITIALIZING) call has been cancelled."));
+            close();
         }
     }
 
