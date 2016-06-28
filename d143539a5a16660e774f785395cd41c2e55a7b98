@@ -1,0 +1,11 @@
+Revision: d143539a5a16660e774f785395cd41c2e55a7b98
+Patch-set: 1
+File: src/com/android/phone/CallFeaturesSetting.java
+
+51
+Tue Jun 28 22:49:47 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 0327a599_2638b62f
+Bytes: 239
+Since this class is not available in AOSP master, we should replace this logic to other configuration mechanism supported in AOSP such as CarrierConfig. Currently, this code seems not be even buildable in AOSP. Is my understanding correct?
+
