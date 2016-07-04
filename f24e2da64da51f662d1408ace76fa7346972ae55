@@ -1,0 +1,49 @@
+Revision: f24e2da64da51f662d1408ace76fa7346972ae55
+Patch-set: 3
+File: src/com/android/phone/settings/fdn/FdnList.java
+
+38:0-40:46
+Mon Jul 04 10:55:54 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9db0560b_7b6b7f06
+Bytes: 70
+Place move these definitions into appropriate place lexicographically.
+
+59:30-59:43
+Mon Jul 04 10:55:54 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9db0560b_3b75f7db
+Bytes: 14
+mCarrierConfig
+
+60:4-60:25
+Mon Jul 04 10:55:54 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9db0560b_5b68c307
+Bytes: 97
+You do not have to define this variable as member variable because this is only used in a method.
+
+112:19-112:70
+Mon Jul 04 10:55:54 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9db0560b_fb5d4f67
+Bytes: 147
+In line 151, there is same call. Why don't you define this as method to avoid duplication of code?
+
+e.g.
+private boolean isFdnDirectDialSupported()
+
+112:45-112:67
+Mon Jul 04 10:55:54 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9db0560b_1b723bf4
+Bytes: 89
+Please let me know where the gerrit which includes this carrier config implementation is.
+
+154:61-154:84
+Mon Jul 04 10:55:54 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 9db0560b_db629323
+Bytes: 206
+Should be "this" because the theme is different. If we use application context, the pop menu is black while activity them is white, inconsistent behavior. Could you modify the code and perform verification?
+
