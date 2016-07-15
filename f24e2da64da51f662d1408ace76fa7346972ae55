@@ -9,6 +9,14 @@ UUID: 9db0560b_7b6b7f06
 Bytes: 70
 Place move these definitions into appropriate place lexicographically.
 
+38:0-40:46
+Fri Jul 15 20:45:51 2016 +0000
+Author: Wileen Chiu <1106833@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 9db0560b_7b6b7f06
+UUID: 7aae48fb_d9d1a40c
+Bytes: 4
+Done
+
 59:30-59:43
 Mon Jul 04 10:55:54 2016 +0000
 Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
@@ -40,10 +48,26 @@ UUID: 9db0560b_1b723bf4
 Bytes: 89
 Please let me know where the gerrit which includes this carrier config implementation is.
 
+112:19-112:70
+Fri Jul 15 20:45:51 2016 +0000
+Author: Wileen Chiu <1106833@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 9db0560b_fb5d4f67
+UUID: 7aae48fb_99d0bc02
+Bytes: 4
+Done
+
 154:61-154:84
 Mon Jul 04 10:55:54 2016 +0000
 Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: 9db0560b_db629323
 Bytes: 206
 Should be "this" because the theme is different. If we use application context, the pop menu is black while activity them is white, inconsistent behavior. Could you modify the code and perform verification?
+
+154:61-154:84
+Fri Jul 15 20:45:51 2016 +0000
+Author: Wileen Chiu <1106833@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 9db0560b_db629323
+UUID: 7aae48fb_79cd1868
+Bytes: 4
+Done
 
