@@ -1,0 +1,20 @@
+Revision: 8b1187ea5fb1b8bbf3497a46ccf32bf210142345
+Patch-set: 4
+File: res/values/strings.xml
+
+1311:4-1311:5
+Wed Jul 20 02:26:10 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 0ab7bbb6_e7598294
+Bytes: 113
+I think this definition should be placed after line 779 with comment to place same-category strings in one place.
+
+File: src/com/android/phone/CallFeaturesSetting.java
+
+0
+Wed Jul 20 02:26:10 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 0ab7bbb6_c75c7e87
+Bytes: 400
+Since this SDN button implementation is not related to the feature of direct dialing from FDN list, this implementation should be separated. Therefore, could you remove the patch in CallFeaturesSetting.java from this gerrit? If this SDN button feature is also necessary to contribute to AOSP, another gerrit should be created - basically, I think we should not handle multiple features in one gerrit.
+
