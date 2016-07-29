@@ -9,6 +9,14 @@ UUID: 0ab7bbb6_e7598294
 Bytes: 113
 I think this definition should be placed after line 779 with comment to place same-category strings in one place.
 
+1311:4-1311:5
+Fri Jul 29 17:56:43 2016 +0000
+Author: Wileen Chiu <1106833@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 0ab7bbb6_e7598294
+UUID: 0f88ada3_6eca7f46
+Bytes: 4
+Done
+
 File: src/com/android/phone/CallFeaturesSetting.java
 
 0
@@ -17,4 +25,12 @@ Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: 0ab7bbb6_c75c7e87
 Bytes: 400
 Since this SDN button implementation is not related to the feature of direct dialing from FDN list, this implementation should be separated. Therefore, could you remove the patch in CallFeaturesSetting.java from this gerrit? If this SDN button feature is also necessary to contribute to AOSP, another gerrit should be created - basically, I think we should not handle multiple features in one gerrit.
+
+0
+Fri Jul 29 17:56:43 2016 +0000
+Author: Wileen Chiu <1106833@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 0ab7bbb6_c75c7e87
+UUID: 0f88ada3_4ebdbba9
+Bytes: 4
+Done
 
