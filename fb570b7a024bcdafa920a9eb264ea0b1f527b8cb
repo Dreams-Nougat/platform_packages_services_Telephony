@@ -1,0 +1,27 @@
+Revision: fb570b7a024bcdafa920a9eb264ea0b1f527b8cb
+Patch-set: 5
+File: /COMMIT_MSG
+
+7:32-7:45
+Mon Aug 01 05:27:31 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 74e90269_0265aa1b
+Bytes: 72
+Please remove because this feature is no longer relevant in this gerrit.
+
+10:0-10:32
+Mon Aug 01 05:27:31 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 74e90269_2260ae0b
+Bytes: 13
+Same as above
+
+File: res/values/strings.xml
+
+781:27-781:34
+Mon Aug 01 05:27:31 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 74e90269_e261a60f
+Bytes: 175
+This is not mandatory fix, but I just recommend to change from "menu_dial_string" to "menu_dial" to align with other strings such as "menu_add", "menu_edit" and "menu_delete".
+
