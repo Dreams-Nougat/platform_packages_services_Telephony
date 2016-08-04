@@ -1,0 +1,11 @@
+Revision: 279438a4942e69176da5799fc6099e789e866299
+Patch-set: 6
+File: src/com/android/phone/settings/fdn/FdnList.java
+
+259:62-259:78
+Thu Aug 04 04:54:09 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 740ae2d3_9aa8cd79
+Bytes: 76
+Change from "menu_dial_string" to "menu_dial" because it causes build error.
+
