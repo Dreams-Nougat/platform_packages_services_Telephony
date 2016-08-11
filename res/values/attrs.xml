@@ -51,4 +51,14 @@
     </declare-styleable>
 
     <attr name="preferenceBackgroundColor" format="color" />
+
+    <declare-styleable name="CallBarringEditPreference">
+        <!-- AO: All outgoing, CommandsInterface.CB_FACILITY_BAOC. -->
+        <!-- OI: Outgoing international, CommandsInterface.CB_FACILITY_BAOIC. -->
+        <!-- OX: Outgoing international roaming, CommandsInterface.CB_FACILITY_BAOICxH. -->
+        <!-- AI: All incoming, CommandsInterface.CB_FACILITY_BAIC. -->
+        <!-- IR: Incoming international roaming, CommandsInterface.CB_FACILITY_BAICr. -->
+        <!-- BA: Deactivate all, CommandsInterface.CB_FACILITY_BA_ALL -->
+        <attr name="facility" format="string" />
+    </declare-styleable>
 </resources>
