@@ -280,6 +280,8 @@ public class ImsConference extends Conference {
                 mConferenceHost.getConnectionCapabilities());
         setConnectionCapabilities(capabilities);
 
+        int properties = applyHostProperties(0, mConferenceHost.getConnectionProperties());
+        setConnectionProperties(properties);
     }
 
     /**
