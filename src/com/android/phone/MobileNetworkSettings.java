@@ -726,8 +726,7 @@ public class MobileNetworkSettings extends PreferenceActivity
         UpdatePreferredNetworkModeSummary(settingsNetworkMode);
         UpdateEnabledNetworksValueAndSummary(settingsNetworkMode);
         // Display preferred network type based on what modem returns b/18676277
-        mPhone.setPreferredNetworkType(settingsNetworkMode, mHandler
-                .obtainMessage(MyHandler.MESSAGE_SET_PREFERRED_NETWORK_TYPE));
+                mPhone.getPreferredNetworkType(mHandler.obtainMessage(MyHandler.MESSAGE_GET_PREFERRED_NETWORK_TYPE));
 
         /**
          * Enable/disable depending upon if there are any active subscriptions.
@@ -939,7 +938,6 @@ public class MobileNetworkSettings extends PreferenceActivity
             return true;
         }
 
-        updateBody();
         // always let the preference setting proceed.
         return true;
     }
@@ -947,6 +945,7 @@ public class MobileNetworkSettings extends PreferenceActivity
     private class MyHandler extends Handler {
 
         static final int MESSAGE_SET_PREFERRED_NETWORK_TYPE = 0;
+        static final int MESSAGE_GET_PREFERRED_NETWORK_TYPE = 1;
 
         @Override
         public void handleMessage(Message msg) {
@@ -954,6 +953,9 @@ public class MobileNetworkSettings extends PreferenceActivity
                 case MESSAGE_SET_PREFERRED_NETWORK_TYPE:
                     handleSetPreferredNetworkTypeResponse(msg);
                     break;
+                case MESSAGE_GET_PREFERRED_NETWORK_TYPE:
+                    handleGetPreferredNetworkTypeResponse(msg);
+                     break;
             }
         }
 
@@ -984,6 +986,28 @@ public class MobileNetworkSettings extends PreferenceActivity
                     log("handleSetPreferredNetworkTypeResponse: exception in setting network mode.");
                 }
                 updatePreferredNetworkUIFromDb();
+            }
+        }
+
+        private void handleGetPreferredNetworkTypeResponse(Message msg) {
+            AsyncResult ar = (AsyncResult) msg.obj;
+            final int phoneSubId = mPhone.getSubId();
+
+            if (ar.exception == null) {
+                int networkMode = ((int[]) ar.result)[0];
+
+                // Store this in setting so onPreferenceChange would trigger even if
+                // network mode from modem does not equal saved network mode
+                android.provider.Settings.Global.putInt(mPhone.getContext().getContentResolver(),
+                        android.provider.Settings.Global.PREFERRED_NETWORK_MODE + phoneSubId,
+                        networkMode );
+
+                UpdatePreferredNetworkModeSummary(networkMode);
+                UpdateEnabledNetworksValueAndSummary(networkMode);
+            } else {
+                if (DBG) {
+                    log("handleGetPreferredNetworkTypeResponse: exception in geting network mode.");
+                }
             }
         }
     }
