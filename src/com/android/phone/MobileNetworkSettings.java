@@ -880,6 +880,7 @@ public class MobileNetworkSettings extends PreferenceActivity
                 switch (buttonNetworkMode) {
                     case Phone.NT_MODE_WCDMA_PREF:
                     case Phone.NT_MODE_GSM_ONLY:
+                    case Phone.NT_MODE_WCDMA_ONLY:
                     case Phone.NT_MODE_LTE_GSM_WCDMA:
                     case Phone.NT_MODE_LTE_CDMA_EVDO_GSM_WCDMA:
                     case Phone.NT_MODE_CDMA:
@@ -1130,12 +1131,22 @@ public class MobileNetworkSettings extends PreferenceActivity
                 mButtonEnabledNetworks.setSummary(R.string.network_3G);
                 break;
             case Phone.NT_MODE_WCDMA_ONLY:
+            if (!mIsGlobalCdma) {
+                    mButtonEnabledNetworks.setValue(
+                            Integer.toString(Phone.NT_MODE_WCDMA_ONLY));
+                    mButtonEnabledNetworks.setSummary(R.string.preferred_network_mode_wcdma_only_choice);
+                } else {
+                    mButtonEnabledNetworks.setValue(
+                            Integer.toString(Phone.NT_MODE_LTE_CDMA_EVDO_GSM_WCDMA));
+                    mButtonEnabledNetworks.setSummary(R.string.network_global);
+                }
+                break;
             case Phone.NT_MODE_GSM_UMTS:
             case Phone.NT_MODE_WCDMA_PREF:
                 if (!mIsGlobalCdma) {
                     mButtonEnabledNetworks.setValue(
                             Integer.toString(Phone.NT_MODE_WCDMA_PREF));
-                    mButtonEnabledNetworks.setSummary(R.string.network_3G);
+                    mButtonEnabledNetworks.setSummary(R.string.preferred_network_mode_gsm_wcdma_preferred_choice);
                 } else {
                     mButtonEnabledNetworks.setValue(
                             Integer.toString(Phone.NT_MODE_LTE_CDMA_EVDO_GSM_WCDMA));
@@ -1146,7 +1157,7 @@ public class MobileNetworkSettings extends PreferenceActivity
                 if (!mIsGlobalCdma) {
                     mButtonEnabledNetworks.setValue(
                             Integer.toString(Phone.NT_MODE_GSM_ONLY));
-                    mButtonEnabledNetworks.setSummary(R.string.network_2G);
+                    mButtonEnabledNetworks.setSummary(R.string.preferred_network_mode_gsm_only_choice);
                 } else {
                     mButtonEnabledNetworks.setValue(
                             Integer.toString(Phone.NT_MODE_LTE_CDMA_EVDO_GSM_WCDMA));
