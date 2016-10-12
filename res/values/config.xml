@@ -218,4 +218,7 @@
 
     <!-- Whether the emergency only account can make emergency calls -->
     <bool name="config_pstnCanPlaceEmergencyCalls">true</bool>
+
+    <!-- Whether the IMS audio uses VOIP mode -->
+    <bool name="config_use_voip_mode_for_ims">false</bool>
 </resources>

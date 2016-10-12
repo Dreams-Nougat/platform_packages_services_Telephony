@@ -48,6 +48,7 @@ import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.SubscriptionController;
 import com.android.internal.telephony.imsphone.ImsExternalCallTracker;
 import com.android.internal.telephony.imsphone.ImsPhone;
+import com.android.internal.telephony.imsphone.ImsPhoneConnection;
 import com.android.phone.MMIDialogActivity;
 import com.android.phone.PhoneUtils;
 import com.android.phone.R;
@@ -334,7 +335,7 @@ public class TelephonyConnectionService extends ConnectionService {
         } else {
             placeOutgoingConnection(connection, phone, request);
         }
-
+        checkVoipAudioMode(connection);
         return connection;
     }
 
@@ -378,10 +379,11 @@ public class TelephonyConnectionService extends ConnectionService {
             return Connection.createCanceledConnection();
         }
 
-        Connection connection =
+        TelephonyConnection connection =
                 createConnectionFor(phone, originalConnection, false /* isOutgoing */,
                         request.getAccountHandle(), request.getTelecomCallId(),
                         request.getAddress());
+        checkVoipAudioMode(connection);
         if (connection == null) {
             return Connection.createCanceledConnection();
         } else {
@@ -483,7 +485,7 @@ public class TelephonyConnectionService extends ConnectionService {
                         !unknownConnection.isIncoming() /* isOutgoing */,
                         request.getAccountHandle(), request.getTelecomCallId(),
                         request.getAddress());
-
+        checkVoipAudioMode(connection);
         if (connection == null) {
             return Connection.createCanceledConnection();
         } else {
@@ -582,6 +584,22 @@ public class TelephonyConnectionService extends ConnectionService {
             }
         }
         return false;
+    }
+
+    /**
+     * Determines whether to use voip audio mode
+     */
+    private void checkVoipAudioMode(TelephonyConnection connection) {
+        if (connection != null) {
+            com.android.internal.telephony.Connection originalConnection = connection
+                    .getOriginalConnection();
+            if (originalConnection instanceof ImsPhoneConnection
+                    && getResources().getBoolean(R.bool.config_use_voip_mode_for_ims)) {
+                connection.setAudioModeIsVoip(true);
+            } else {
+                connection.setAudioModeIsVoip(false);
+            }
+        }
     }
 
     private Phone getPhoneForAccount(PhoneAccountHandle accountHandle, boolean isEmergency) {
