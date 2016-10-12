@@ -736,6 +736,7 @@ abstract class TelephonyConnection extends Connection {
 
         if (isImsConnection()) {
             mWasImsConnection = true;
+            setAudioModeIsVoip(true);
         }
         mIsMultiParty = mOriginalConnection.isMultiparty();
 
