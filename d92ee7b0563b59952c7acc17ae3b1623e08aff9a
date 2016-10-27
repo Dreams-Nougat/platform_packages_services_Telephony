@@ -1,0 +1,18 @@
+Revision: d92ee7b0563b59952c7acc17ae3b1623e08aff9a
+Patch-set: 1
+File: src/com/android/services/telephony/TelephonyConnection.java
+
+393:20-393:50
+Thu Oct 27 22:15:01 2016 +0000
+Author: Robert Greenwalt <1002609@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: c66052e7_6a969798
+Bytes: 99
+why not always support it but have connection impls return a generic value if they don't know more?
+
+1014:69-1014:94
+Thu Oct 27 22:15:01 2016 +0000
+Author: Robert Greenwalt <1002609@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: c66052e7_4ac87363
+Bytes: 95
+is this code getting added to com.android.internal.telephony.Connection?  Am I missing a patch?
+
