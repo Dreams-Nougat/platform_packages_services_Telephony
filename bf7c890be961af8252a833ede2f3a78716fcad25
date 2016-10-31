@@ -1,0 +1,11 @@
+Revision: bf7c890be961af8252a833ede2f3a78716fcad25
+Patch-set: 2
+File: sip/src/com/android/services/telephony/sip/SipEditor.java
+
+590:4-590:68
+Mon Oct 31 18:08:40 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 26420e7f_a68c0c55
+Bytes: 48
+Declare inner classes at the start of the class.
+
