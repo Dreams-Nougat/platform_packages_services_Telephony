@@ -1,0 +1,16 @@
+Revision: 67d5d0514202c63fb197390687d22213624f7fda
+Patch-set: 2
+File: src/com/android/services/telephony/TelephonyConnection.java
+
+739:12-739:36
+Mon Oct 31 17:58:28 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 26420e7f_865f50f9
+Bytes: 446
+There are IMS stack implementations which rely on the route being via the modem.  I can see how a software-based stack would require the audio-mode to be voip, however.
+
+I think this change is reasonable, but it needs to be gated on a config.xml value which you'd set in your own distribution.
+
+Suggest: use_voip_mode_for_ims
+The default config.xml would be false, and you can use a device overlay to override that in your implementation to true.
+
