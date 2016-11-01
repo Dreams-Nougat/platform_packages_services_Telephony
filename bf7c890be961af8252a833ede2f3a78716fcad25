@@ -9,3 +9,11 @@ UUID: 26420e7f_a68c0c55
 Bytes: 48
 Declare inner classes at the start of the class.
 
+590:4-590:68
+Tue Nov 01 02:18:23 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 26420e7f_a68c0c55
+UUID: 867adaf4_287c8bd9
+Bytes: 186
+Tyler, thanks for review. I have moved this class to the start of the class in new patch-set. Could you review again? If modification is inappropriate, please kindly let me know. Thanks.
+
