@@ -9,10 +9,29 @@ UUID: c66052e7_6a969798
 Bytes: 99
 why not always support it but have connection impls return a generic value if they don't know more?
 
+393:20-393:50
+Sat Nov 05 01:43:25 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: c66052e7_6a969798
+UUID: 6bde8ff8_cf36dd47
+Bytes: 537
+Some carriers require displaying precise cause per each cause code which network replies, while others do not require that. Thus, we need configuration.
+
+
+In telephony fwk, precise code is always available (this grouped into normal disconnect code), so it is possible to return precise code to application always. However, in that case, we need to switch if show generic cause or precise cause in InCallUI. Should we implement this switch logic in InCallUI? If yes, should we refer to CarrierConfig in InCallUI or just use normal config?
+
 1014:69-1014:94
 Thu Oct 27 22:15:01 2016 +0000
 Author: Robert Greenwalt <1002609@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: c66052e7_4ac87363
 Bytes: 95
 is this code getting added to com.android.internal.telephony.Connection?  Am I missing a patch?
+
+1014:69-1014:94
+Sat Nov 05 01:43:25 2016 +0000
+Author: Toshiya Ikenaga <1097598@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: c66052e7_4ac87363
+UUID: 6bde8ff8_8f30d549
+Bytes: 50
+No. This method already exists in current Android.
 
