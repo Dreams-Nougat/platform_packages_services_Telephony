@@ -351,6 +351,7 @@ public class PhoneGlobals extends ContextWrapper {
             IntentFilter intentFilter =
                     new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED);
             intentFilter.addAction(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
+            intentFilter.addAction(TelephonyIntents.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED);
             intentFilter.addAction(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
             intentFilter.addAction(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED);
             intentFilter.addAction(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED);
@@ -722,36 +723,66 @@ public class PhoneGlobals extends ContextWrapper {
                 int subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY,
                         SubscriptionManager.INVALID_SUBSCRIPTION_ID);
                 int phoneId = SubscriptionManager.getPhoneId(subId);
+                String apnType = intent.getStringExtra(PhoneConstants.DATA_APN_TYPE_KEY);
                 String state = intent.getStringExtra(PhoneConstants.STATE_KEY);
+                String reason = intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY);
                 if (VDBG) {
                     Log.d(LOG_TAG, "mReceiver: ACTION_ANY_DATA_CONNECTION_STATE_CHANGED");
+                    Log.d(LOG_TAG, "- apnType: " + apnType);
                     Log.d(LOG_TAG, "- state: " + state);
-                    Log.d(LOG_TAG, "- reason: "
-                    + intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY));
+                    Log.d(LOG_TAG, "- reason: " + reason);
                     Log.d(LOG_TAG, "- subId: " + subId);
                     Log.d(LOG_TAG, "- phoneId: " + phoneId);
                 }
-                Phone phone = SubscriptionManager.isValidPhoneId(phoneId) ?
-                        PhoneFactory.getPhone(phoneId) : PhoneFactory.getDefaultPhone();
 
                 // If not default data subscription, ignore the broadcast intent and avoid action.
                 if (subId != SubscriptionManager.getDefaultDataSubscriptionId()) {
                     if (VDBG) Log.d(LOG_TAG, "Ignore broadcast intent as not default data sub.");
                     return;
                 }
+
+                // If the apn type of data connection state changed event is NOT default,
+                // ignore the broadcast intent and avoid action.
+                if (!PhoneConstants.APN_TYPE_DEFAULT.equals(apnType)) {
+                    if (VDBG) Log.d(LOG_TAG, "Ignore broadcast intent as not default apn type");
+                    return;
+                }
+
+                Phone phone = SubscriptionManager.isValidPhoneId(phoneId) ?
+                        PhoneFactory.getPhone(phoneId) : PhoneFactory.getDefaultPhone();
+
                 // The "data disconnected due to roaming" notification is shown
                 // if (a) you have the "data roaming" feature turned off, and
-                // (b) you just lost data connectivity because you're roaming.
-                boolean disconnectedDueToRoaming =
-                        !phone.getDataRoamingEnabled()
-                        && PhoneConstants.DataState.DISCONNECTED.equals(state)
-                        && Phone.REASON_ROAMING_ON.equals(
-                            intent.getStringExtra(PhoneConstants.STATE_CHANGE_REASON_KEY));
-                if (mDataDisconnectedDueToRoaming != disconnectedDueToRoaming) {
-                    mDataDisconnectedDueToRoaming = disconnectedDueToRoaming;
-                    mHandler.sendEmptyMessage(disconnectedDueToRoaming
-                            ? EVENT_DATA_ROAMING_DISCONNECTED : EVENT_DATA_ROAMING_OK);
+                // (b) device registered to roaming network, and
+                // (c) the data state of default internet is NOT connected, and
+                // (d) you just or once lost data connectivity because you're in roaming.
+                boolean disconnectedDueToRoaming = !phone.getDataRoamingEnabled()
+                        && phone.getServiceState().getDataRoaming()
+                        && !PhoneConstants.DataState.CONNECTED.toString().equals(state);
+                disconnectedDueToRoaming &= mDataDisconnectedDueToRoaming
+                        || PhoneConstants.DataState.DISCONNECTED.toString().equals(state);
+                disconnectedDueToRoaming &= mDataDisconnectedDueToRoaming
+                        || Phone.REASON_ROAMING_ON.equals(reason);
+                updateDataDisconnectedRoamingNotification(disconnectedDueToRoaming);
+            } else if (action.equals(TelephonyIntents.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)) {
+                int subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY,
+                        SubscriptionManager.INVALID_SUBSCRIPTION_ID);
+                int phoneId = SubscriptionManager.getPhoneId(subId);
+                if (VDBG) {
+                    Log.d(LOG_TAG, "mReceiver: ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED");
+                    Log.d(LOG_TAG, "- subId: " + subId);
+                    Log.d(LOG_TAG, "- phoneId: " + phoneId);
                 }
+
+                Phone phone = SubscriptionManager.isValidPhoneId(phoneId) ?
+                        PhoneFactory.getPhone(phoneId) : PhoneFactory.getDefaultPhone();
+                // The "data disconnected due to roaming" notification is shown
+                // if (a) DDS was changed to a SIM card, and
+                // (b) you have the "data roaming" feature turned off, and
+                // (c) device registered to roaming network.
+                boolean disconnectedDueToRoaming = !phone.getDataRoamingEnabled()
+                        && phone.getServiceState().getDataRoaming();
+                updateDataDisconnectedRoamingNotification(disconnectedDueToRoaming);
             } else if ((action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) &&
                     (mPUKEntryActivity != null)) {
                 // if an attempt to un-PUK-lock the device was made, while we're
@@ -813,6 +844,16 @@ public class PhoneGlobals extends ContextWrapper {
                 int state = ss.getState();
                 notificationMgr.updateNetworkSelection(state);
             }
+        }
+    }
+
+    private void updateDataDisconnectedRoamingNotification(boolean disconnectedDueToRoaming) {
+        if (mDataDisconnectedDueToRoaming != disconnectedDueToRoaming) {
+            if (DBG) Log.d(LOG_TAG, "updateDataDisconnectedRoamingNotification:"
+                    + " disconnectedDueToRoaming=" + disconnectedDueToRoaming);
+            mDataDisconnectedDueToRoaming = disconnectedDueToRoaming;
+            mHandler.sendEmptyMessage(disconnectedDueToRoaming
+                    ? EVENT_DATA_ROAMING_DISCONNECTED : EVENT_DATA_ROAMING_OK);
         }
     }
 
