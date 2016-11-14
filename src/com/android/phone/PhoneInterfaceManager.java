@@ -47,6 +47,7 @@ import android.telephony.IccOpenLogicalChannelResponse;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.RadioAccessFamily;
 import android.telephony.ServiceState;
+import android.telephony.SimActivationState;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
@@ -1825,6 +1826,34 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
         Boolean success = (Boolean) sendRequest(CMD_SET_VOICEMAIL_NUMBER,
                 new Pair<String, String>(alphaTag, number), new Integer(subId));
         return success;
+    }
+
+    /**
+     * Sets the voice activation state of a given subId.
+     */
+    @Override
+    public boolean setVoiceActivationState(int subId, int activationState) {
+        enforceModifyPermissionOrCarrierPrivilege(subId);
+        final Phone phone = getPhone(subId);
+        if (phone != null) {
+            return phone.setVoiceActivationState(activationState);
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Sets the data activation state of a given subId.
+     */
+    @Override
+    public boolean setDataActivationState(int subId, int activationState) {
+        enforceModifyPermissionOrCarrierPrivilege(subId);
+        final Phone phone = getPhone(subId);
+        if (phone != null) {
+            return phone.setDataActivationState(activationState);
+        } else {
+            return false;
+        }
     }
 
     /**
