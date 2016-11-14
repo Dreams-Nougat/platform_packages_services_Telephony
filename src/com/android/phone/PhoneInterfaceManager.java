@@ -1828,6 +1828,34 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
     }
 
     /**
+     * Sets the voice activation state of a given subId.
+     */
+    @Override
+    public boolean setVoiceActivationState(int subId, int activationState) {
+        enforceModifyPermissionOrCarrierPrivilege(subId);
+        final Phone phone = getPhone(subId);
+        if (phone != null) {
+            return phone.setVoiceActivationState(activationState);
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Sets the data activation state of a given subId.
+     */
+    @Override
+    public boolean setDataActivationState(int subId, int activationState) {
+        enforceModifyPermissionOrCarrierPrivilege(subId);
+        final Phone phone = getPhone(subId);
+        if (phone != null) {
+            return phone.setDataActivationState(activationState);
+        } else {
+            return false;
+        }
+    }
+
+    /**
      * Returns the unread count of voicemails
      */
     public int getVoiceMessageCount() {
