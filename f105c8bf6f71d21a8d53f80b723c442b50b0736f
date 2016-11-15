@@ -1,0 +1,47 @@
+Revision: f105c8bf6f71d21a8d53f80b723c442b50b0736f
+Patch-set: 2
+File: src/com/android/phone/NotificationMgr.java
+
+365:57-365:61
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_bd2b7891
+Bytes: 69
+true /* excludeDying */
+Gives more context of what the "true" is for.
+
+377:6-380:5
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_bdec184b
+Bytes: 90
+Looks like a closing brace is missing here?  Or something is not indented as it should be.
+
+382:4-394:7
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_ddef5c3e
+Bytes: 46
+Should update the comment for its new purpose.
+
+395:20-395:56
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_bd34183c
+Bytes: 55
+Suggest name: maybeSendVMNotificationUsingDefaultDialer
+
+422:12-422:45
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_fd57c06f
+Bytes: 70
+Uh oh, not sure you want your name immortalized in the logs like this.
+
+447:0-447:0
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_7d43b0af
+Bytes: 22
+Nit: extra space here.
+

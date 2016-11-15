@@ -1,0 +1,23 @@
+Revision: 7b821620a8daf33c9e387d1a19fb9a77af4425f1
+Base-for-patch-set: 2
+File: res/values/config.xml
+
+211:3-211:65
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_dd50fc7d
+Bytes: 319
+Have you confirms with the Wear folks that it is okay to remove this?
+
+I notice that the device overlay for Wear sets this value to their own voicemail component. 
+https://cs.corp.google.com/android/device/google/clockwork/overlay/packages/services/Telephony/res/values/config.xml?q=config_customVoicemailComponent&l=14
+
+File: src/com/android/phone/NotificationMgr.java
+
+369:16-372:40
+Tue Nov 15 04:26:25 2016 +0000
+Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 7037600d_fd3500ee
+Bytes: 138
+How come this is being changed to explicitly loop through all the users?  Does the UserHandle.ALL parameter not accomplish the same thing?
+
