@@ -12,6 +12,14 @@ Have you confirms with the Wear folks that it is okay to remove this?
 I notice that the device overlay for Wear sets this value to their own voicemail component. 
 https://cs.corp.google.com/android/device/google/clockwork/overlay/packages/services/Telephony/res/values/config.xml?q=config_customVoicemailComponent&l=14
 
+211:3-211:65
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_dd50fc7d
+UUID: 7037600d_5f420b7b
+Bytes: 119
+I think the only usage for it is in NotificationMgr and it is removed in this CL. Wear folks are added to the reviewer.
+
 File: src/com/android/phone/NotificationMgr.java
 
 369:16-372:40
@@ -20,4 +28,12 @@ Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: 7037600d_fd3500ee
 Bytes: 138
 How come this is being changed to explicitly loop through all the users?  Does the UserHandle.ALL parameter not accomplish the same thing?
+
+369:16-372:40
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_fd3500ee
+UUID: 7037600d_1f68832f
+Bytes: 177
+Each default dialer for all users should cancel their own notification, and a common default dialer does not necessary exist. (and DefaultDialerManager throws on UserHandle.ALL)
 

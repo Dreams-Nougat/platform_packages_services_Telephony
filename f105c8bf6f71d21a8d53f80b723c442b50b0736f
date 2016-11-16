@@ -10,12 +10,28 @@ Bytes: 69
 true /* excludeDying */
 Gives more context of what the "true" is for.
 
+365:57-365:61
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_bd2b7891
+UUID: 7037600d_7f58afa1
+Bytes: 4
+Done
+
 377:6-380:5
 Tue Nov 15 04:26:25 2016 +0000
 Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: 7037600d_bdec184b
 Bytes: 90
 Looks like a closing brace is missing here?  Or something is not indented as it should be.
+
+377:6-380:5
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_bdec184b
+UUID: 7037600d_7f2f0fe5
+Bytes: 30
+bad manual cherry pick, fixed.
 
 382:4-394:7
 Tue Nov 15 04:26:25 2016 +0000
@@ -24,12 +40,28 @@ UUID: 7037600d_ddef5c3e
 Bytes: 46
 Should update the comment for its new purpose.
 
+382:4-394:7
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_ddef5c3e
+UUID: 7037600d_9f6f7315
+Bytes: 4
+Done
+
 395:20-395:56
 Tue Nov 15 04:26:25 2016 +0000
 Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: 7037600d_bd34183c
 Bytes: 55
 Suggest name: maybeSendVMNotificationUsingDefaultDialer
+
+395:20-395:56
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_bd34183c
+UUID: 7037600d_7f6c2f20
+Bytes: 4
+Done
 
 422:12-422:45
 Tue Nov 15 04:26:25 2016 +0000
@@ -38,10 +70,26 @@ UUID: 7037600d_fd57c06f
 Bytes: 70
 Uh oh, not sure you want your name immortalized in the logs like this.
 
+422:12-422:45
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_fd57c06f
+UUID: 7037600d_9f8653a3
+Bytes: 106
+Figured out that developing on master and then cherry picking to aosp_master to submit is a very bad idea.
+
 447:0-447:0
 Tue Nov 15 04:26:25 2016 +0000
 Author: Tyler Gunn <1056478@85c56323-6fa9-3386-8a01-6480fb634889>
 UUID: 7037600d_7d43b0af
 Bytes: 22
 Nit: extra space here.
+
+447:0-447:0
+Wed Nov 16 19:06:00 2016 +0000
+Author: Ta-wei Yen <1097644@85c56323-6fa9-3386-8a01-6480fb634889>
+Parent: 7037600d_7d43b0af
+UUID: 7037600d_bf9d17fa
+Bytes: 4
+Done
 
