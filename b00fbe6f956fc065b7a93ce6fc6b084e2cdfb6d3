@@ -1,0 +1,20 @@
+Revision: b00fbe6f956fc065b7a93ce6fc6b084e2cdfb6d3
+Patch-set: 10
+File: src/com/android/phone/settings/fdn/FdnList.java
+
+75:36-75:63
+Fri Dec 02 18:53:02 2016 +0000
+Author: Robert Greenwalt <1002609@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 6dedc706_f02e80bd
+Bytes: 83
+this value could change if the user swaps sims.  Does this UI rebuild in that case?
+
+150:13-150:38
+Fri Dec 02 18:53:02 2016 +0000
+Author: Robert Greenwalt <1002609@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 6dedc706_f0132084
+Bytes: 265
+Changing UI options is one thing, but changing the UI flow (tap goes straight to edits sometimes, goes to popup menu other times) based on carrier config may not be good.
+
+How about if we always show the popup with edit/delete and conditionally add the dial option?
+
