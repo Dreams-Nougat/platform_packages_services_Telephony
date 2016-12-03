@@ -1,0 +1,11 @@
+Revision: 88ab50191fac212b99a8c1ae236aa42206a8a960
+Patch-set: 2
+File: src/com/android/phone/PhoneInterfaceManager.java
+
+50:25-50:43
+Sat Dec 03 01:41:15 2016 +0000
+Author: Robert Greenwalt <1002609@85c56323-6fa9-3386-8a01-6480fb634889>
+UUID: 6dedc706_c4a05edb
+Bytes: 9
+not used?
+
