@@ -957,10 +957,16 @@ abstract class TelephonyConnection extends Connection {
         boolean isVideoCall = VideoProfile.isVideo(getVideoState());
 
         PersistableBundle b = getCarrierConfig();
+        boolean hdAudioIconDisabled =
+                b != null && b.getBoolean(CarrierConfigManager.KEY_DISABLE_HD_AUDIO_ICON);
         boolean canWifiCallsBeHdAudio =
                 b != null && b.getBoolean(CarrierConfigManager.KEY_WIFI_CALLS_CAN_BE_HD_AUDIO);
         boolean canVideoCallsBeHdAudio =
                 b != null && b.getBoolean(CarrierConfigManager.KEY_VIDEO_CALLS_CAN_BE_HD_AUDIO);
+
+        if (hdAudioIconDisabled) {
+            return false;
+        }
 
         if (isVideoCall && !canVideoCallsBeHdAudio) {
             return false;
