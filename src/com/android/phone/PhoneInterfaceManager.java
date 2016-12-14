@@ -1645,9 +1645,7 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
 
     @Override
     public String getImeiForSlot(int slotId, String callingPackage) {
-      if (!canReadPhoneState(callingPackage, "getImeiForSlot")) {
-          return null;
-      }
+      enforceReadPrivilegedPermission();
       Phone phone = PhoneFactory.getPhone(slotId);
       return phone == null ? null : phone.getImei();
     }
